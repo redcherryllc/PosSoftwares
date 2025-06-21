@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block content %}
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales by Customer Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .table-container, .table-container * {
+                visibility: visible;
+            }
+            .table-container {
+                position: absolute;
+                left: 0;
+                top: 0;
+            }
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-6">
+        <header class="flex justify-between items-center mb-6 no-print">
+            <h1 class="text-2xl font-bold">Sales by Customer Report</h1>
+            <div class="flex gap-2">
+                <button onclick="printTables()" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                    Print Report
+                </button>
+                <button onclick="exportToExcel()" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                    Export to Excel
+                </button>
+            </div>
+        </header>
+
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6 no-print">
+            <form method="GET" class="flex space-x-4">
+                <div>
+                    <label for="start_date" class="block text-sm font-medium">Start Date</label>
+                    <input type="date" id="start_date" name="start_date" value="{{ start_date|date:'Y-m-d' }}"
+                           class="mt-1 p-2 border rounded-md">
+                </div>
+                <div>
+                    <label for="end_date" class="block text-sm font-medium">End Date</label>
+                    <input type="date" id="end_date" name="end_date" value="{{ end_date|date:'Y-m-d' }}"
+                           class="mt-1 p-2 border rounded-md">
+                </div>
+                <div class="flex items-end">
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                        Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        {% if messages %}
+            <div class="mb-6 no-print">
+                {% for message in messages %}
+                    <div class="bg-red-100 text-red-700 p-4 rounded-md">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <div id="table-container" class="table-container">
+                
+                <h2 class="text-xl font-semibold mb-4">{{ business_unit.business_unit_name }}</h2>
+                <p class="mb-4">Period: {{ start_date|date:'Y-m-d' }} to {{ end_date|date:'Y-m-d' }}</p>
+                
+            
+                <table id="sales-table" class="w-full border-collapse">
+                    <thead>
+                        <tr class="bg-gray-200">
+                            <th class="border p-2 text-left">Customer Name</th>
+                            <th class="border p-2 text-right">Number of Orders</th>
+                            <th class="border p-2 text-right">Total Sales</th>
+                            <th class="border p-2 text-right">Outstanding Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sale in sales %}
+                            <tr>
+                                <td class="border p-2">{{ sale.customer_name }}</td>
+                                <td class="border p-2 text-right">{{ sale.number_of_orders|default:"0" }}</td>
+                                <td class="border p-2 text-right">{{ sale.total_sales|floatformat:2|default:"0.00" }}</td>
+                                <td class="border p-2 text-right">{{ sale.outstanding_balance|floatformat:2|default:"0.00" }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="4" class="border p-2 text-center">No sales data found.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function printTables() {
+            window.print();
+        }
+
+        function exportToExcel() {
+            
+            const wb = XLSX.utils.book_new();
+            
+            
+            const tableContainer = document.getElementById('table-container');
+            const container = tableContainer.cloneNode(true);
+            
+    
+            const fullTable = document.createElement('table');
+            const tbody = document.createElement('tbody');
+            
+            
+            const businessUnitRow = document.createElement('tr');
+            const businessUnitCell = document.createElement('td');
+            businessUnitCell.colSpan = 4;
+            businessUnitCell.textContent = "{{ business_unit.business_unit_name }}";
+            businessUnitCell.style.fontWeight = 'bold';
+            businessUnitCell.style.fontSize = '16px';
+            businessUnitRow.appendChild(businessUnitCell);
+            tbody.appendChild(businessUnitRow);
+            
+            
+            const dateRow = document.createElement('tr');
+            const dateCell = document.createElement('td');
+            dateCell.colSpan = 4;
+            dateCell.textContent = "Period: {{ start_date|date:'Y-m-d' }} to {{ end_date|date:'Y-m-d' }}";
+            dateRow.appendChild(dateCell);
+            tbody.appendChild(dateRow);
+            
+        
+            tbody.appendChild(document.createElement('tr'));
+            
+            
+            const salesTable = container.querySelector('#sales-table');
+            
+            
+            const headerRow = salesTable.querySelector('thead tr').cloneNode(true);
+            tbody.appendChild(headerRow);
+            
+            
+            const dataRows = Array.from(salesTable.querySelectorAll('tbody tr'));
+            dataRows.forEach(row => {
+                tbody.appendChild(row.cloneNode(true));
+            });
+            
+            
+            fullTable.appendChild(tbody);
+            
+            
+            const ws = XLSX.utils.table_to_sheet(fullTable);
+            
+        
+            XLSX.utils.book_append_sheet(wb, ws, "Sales by Customer");
+            
+            
+            const startDate = "{{ start_date|date:'Y-m-d' }}".replace(/-/g, '');
+            const endDate = "{{ end_date|date:'Y-m-d' }}".replace(/-/g, '');
+            XLSX.writeFile(wb, `sales_by_customer_${startDate}_${endDate}.xlsx`);
+        }
+    </script>
+</body>
+{% endblock content %}

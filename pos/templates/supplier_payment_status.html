@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% block content %}
+<div style="max-width: 1000px; margin: 20px auto; padding: 20px; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+    <h2 style="text-align: center; margin-bottom: 30px; font-size: 28px; color: #333;">Supplier Payment Status</h2>
+
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; font-size: 15px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); border-radius: 8px; overflow: hidden;">
+            <thead style="background-color: #2196F3; color: white; text-align: left;">
+                <tr>
+                    <th style="padding: 15px; text-align: center;">Supplier</th>
+                    <th style="padding: 15px; text-align: center;">Number of POs</th>
+                    <th style="padding: 15px; text-align: right;">Total Purchases</th>
+                    <th style="padding: 15px; text-align: right;">Total Payments</th>
+                    <th style="padding: 15px; text-align: right;">Outstanding Balance</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for supplier in supplier_data %}
+                <tr style="background-color: {% cycle '#f9f9f9' 'white' %}; transition: background-color 0.3s, transform 0.2s;">
+                    <td style="padding: 15px; border-bottom: 1px solid #ddd; text-align: center;">{{ supplier.supplier_name }}</td>
+                    <td style="padding: 15px; border-bottom: 1px solid #ddd; text-align: center;">{{ supplier.number_of_pos }}</td>
+                    <td style="padding: 15px; border-bottom: 1px solid #ddd; text-align: right;">{{ supplier.total_purchases }}</td>
+                    <td style="padding: 15px; border-bottom: 1px solid #ddd; text-align: right;">{{ supplier.total_payments }}</td>
+                    <td style="padding: 15px; border-bottom: 1px solid #ddd; text-align: right;">{{ supplier.outstanding_balance }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" style="padding: 15px; text-align: center; color: #666; border-bottom: 1px solid #ddd;">No supplier data found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<style>
+    table th {
+        font-size: 16px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #ddd;
+    }
+    table td {
+        font-size: 15px;
+        color: #555;
+    }
+    tbody tr:hover {
+        background-color: #e0f7fa;
+        transform: scale(1.02);
+        cursor: pointer;
+    }
+    tbody tr:nth-child(odd) {
+        background-color: #f9f9f9;
+    }
+    tbody tr:nth-child(even) {
+        background-color: white;
+    }
+    tbody tr td {
+        padding: 12px;
+        border-bottom: 1px solid #ddd;
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,121 @@
+
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Purchase Order Bill - {{ purchase_order.pono }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .printable, .printable * {
+                visibility: visible;
+            }
+            .printable {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            .no-print {
+                display: none;
+            }
+         
+            .admin-dashboard, nav, header:not(.printable header), [class*="dashboard"], [id*="dashboard"] {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+    <div class="container mx-auto p-6 max-w-4xl">
+        <header class="flex justify-between items-center mb-6 no-print">
+            <h1 class="text-2xl font-bold">Purchase Order Bill - {{ purchase_order.pono }}</h1>
+            <a href="{% url 'po_inquiry' %}" class="text-blue-600 hover:underline">Back to Inquiry</a>
+        </header>
+
+        {% if messages %}
+            <div class="mb-6 no-print">
+                {% for message in messages %}
+                    <div class="bg-red-100 text-red-700 p-4 rounded-md">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="bg-white p-8 rounded-lg shadow-md printable">
+    
+            <div class="border-b pb-4 mb-6">
+                <h2 class="text-3xl font-bold text-gray-800">Purchase Order Bill</h2>
+                <div class="flex justify-between mt-4">
+                    <div>
+                        <p class="text-lg font-semibold">{{ saas_customer.customer_name }}</p>
+                        <p class="text-sm text-gray-600">{{ business_unit_group.group_name }}</p>
+                        <p class="text-sm text-gray-600">{{ business_unit.unit_name }}</p>
+                    </div>
+                    <div class="text-right">
+                        <p><strong>PO Number:</strong> {{ purchase_order.pono }}</p>
+                        <p><strong>Order Date:</strong> {{ purchase_order.order_date|date:"Y-m-d" }}</p>
+                        <p><strong>Expected Delivery:</strong> {{ purchase_order.expected_delivery_date|date:"Y-m-d" }}</p>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <p class="text-base font-semibold text-gray-600">
+                        <strong>Supplier:</strong> {{ purchase_order.supplier.supplier_name }}
+                    </p>
+                </div>
+            </div>
+
+   
+            <h2 class="text-xl font-semibold mb-4">Order Details</h2>
+            <table class="w-full border-collapse mb-6">
+                <thead>
+                    <tr class="bg-gray-200 text-gray-700">
+                        <th class="border border-gray-300 p-3 text-left font-semibold">Product</th>
+                        <th class="border border-gray-300 p-3 text-right font-semibold">Quantity</th>
+                        <th class="border border-gray-300 p-3 text-right font-semibold">Unit Price</th>
+                        <th class="border border-gray-300 p-3 text-right font-semibold">Tax Rate</th>
+                        <th class="border border-gray-300 p-3 text-right font-semibold">Line Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in purchase_order.items_list %}
+                        <tr class="text-gray-600">
+                            <td class="border border-gray-300 p-3">{{ item.product.product_name }}</td>
+                            <td class="border border-gray-300 p-3 text-right">{{ item.quantity|floatformat:2 }}</td>
+                            <td class="border border-gray-300 p-3 text-right">{{ item.unit_price|floatformat:2 }}</td>
+                            <td class="border border-gray-300 p-3 text-right">{{ item.tax_rate|floatformat:2 }}%</td>
+                            <td class="border border-gray-300 p-3 text-right">{{ item.line_total|floatformat:2 }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5" class="border border-gray-300 p-3 text-center text-gray-600">No items found.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+     
+            <div class="flex justify-end">
+                <div class="w-1/3">
+                    <div class="border-t pt-4">
+                        <p class="text-xl font-semibold text-gray-800"><strong>Total Amount:</strong> {{ purchase_order.total_amount|floatformat:2 }}</p>
+                        <p class="text-xl font-semibold text-gray-800"><strong>Paid Amount:</strong> {{ purchase_order.paid_amount|floatformat:2 }}</p>
+                    </div>
+                </div>
+            </div>
+
+          
+            <div class="mt-6 no-print">
+                <button onclick="window.print()" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
+                    Print Bill
+                </button>
+            </div>
+        </div>
+    </div>
+</body>
+{% endblock %}

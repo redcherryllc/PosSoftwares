@@ -1,0 +1,129 @@
+body, html {
+    height: 100%;
+    margin: 0;
+    font-family: 'Arial', sans-serif;
+    background: url('https://images.unsplash.com/photo-1504674900247-0877df9cc836?ixlib=rb-4.0.3&auto=format&fit=crop&w=1350&q=80') no-repeat center center fixed;
+    background-size: cover;
+}
+.login-container {
+    display: flex;
+    height: 100vh;
+    align-items: center;
+    justify-content: center;
+}
+.login-card {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    max-width: 400px;
+    padding: 30px;
+    margin: 20px;
+}
+.logo {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 10px;
+}
+.welcome-text {
+    font-size: 1.2rem;
+    color: #666;
+    margin-bottom: 20px;
+}
+.form-label {
+    font-size: 0.9rem;
+    color: #333;
+    margin-bottom: 5px;
+}
+.input-group {
+    position: relative;
+}
+.form-control {
+    border-radius: 5px;
+    padding: 10px 10px 10px 40px; 
+    font-size: 1rem;
+    border: 1px solid #ced4da;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+.form-control:focus {
+    border-color: #28a745;
+    box-shadow: 0 0 5px rgba(40, 167, 69, 0.3);
+    outline: none;
+}
+.form-control:invalid:not(:focus) {
+    border-color: #dc3545;
+}
+.input-group-text {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    padding: 10px;
+    color: #666;
+    z-index: 10;
+}
+.btn-signin {
+    background-color: #28a745;
+    border: none;
+    border-radius: 5px;
+    padding: 10px;
+    font-size: 1rem;
+    width: 100%;
+    transition: background-color 0.3s;
+}
+.btn-signin:hover {
+    background-color: #218838;
+}
+.form-check-label {
+    font-size: 0.9rem;
+    color: #666;
+}
+.forgot-password {
+    font-size: 0.9rem;
+    color: #007bff;
+    text-decoration: none;
+}
+.forgot-password:hover {
+    text-decoration: underline;
+}
+.signup-link {
+    font-size: 0.9rem;
+    color: #666;
+    text-align: center;
+    margin-top: 15px;
+}
+.signup-link a {
+    color: #007bff;
+    text-decoration: none;
+}
+.signup-link a:hover {
+    text-decoration: underline;
+}
+.messages {
+    margin-bottom: 15px;
+}
+.messages p {
+    margin: 0;
+    padding: 10px;
+    border-radius: 5px;
+}
+.messages .error {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+.messages .success {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.invalid-feedback {
+    display: none;
+    font-size: 0.8rem;
+    color: #dc3545;
+}
+.form-control:invalid:focus + .invalid-feedback {
+    display: block;
+}

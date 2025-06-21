@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Purchase by Supplier Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @media print {
+            body * { visibility: hidden; }
+            #reportSection, #reportSection * { visibility: visible; }
+            #reportSection {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                padding: 20px;
+            }
+            .no-print { display: none; }
+            table {
+                font-size: 10pt;
+            }
+            th, td {
+                padding: 6px;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 font-sans">
+    <div class="container mx-auto p-6">
+        <header class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold">Purchase by Supplier Report</h1>
+        </header>
+
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6 no-print">
+            <form method="GET" action="{% url 'purchase_by_supplier_report' %}" class="flex flex-wrap gap-4">
+                <div>
+                    <label for="start_date" class="block text-sm font-medium">Start Date</label>
+                    <input type="date" id="start_date" name="start_date" value="{{ start_date|date:'Y-m-d' }}" class="mt-1 p-2 border rounded-md" required>
+                </div>
+                <div>
+                    <label for="end_date" class="block text-sm font-medium">End Date</label>
+                    <input type="date" id="end_date" name="end_date" value="{{ end_date|date:'Y-m-d' }}" class="mt-1 p-2 border rounded-md" required>
+                </div>
+                <div class="flex items-end space-x-2">
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Filter</button>
+                    <button type="button" onclick="printReport()" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">Print</button>
+                    <button type="button" onclick="exportToExcel()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">Export to Excel</button>
+                </div>
+            </form>
+        </div>
+
+        {% if messages %}
+            <div class="mb-6">
+                {% for message in messages %}
+                    <div class="bg-red-100 text-red-700 p-4 rounded-md">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div id="reportSection" class="bg-white p-8 rounded-lg shadow-md print:shadow-none print:border print:border-gray-300">
+            <div class="flex justify-between items-center mb-4">
+                <div>
+                    <h2 class="text-2xl font-bold">{{ business_unit.business_unit_name }}</h2>
+                    <p class="text-sm text-gray-600">Date Range: {{ start_date }} to {{ end_date }}</p>
+                </div>
+            </div>
+
+            <table id="purchaseTable" class="w-full border border-gray-300 border-collapse text-sm">
+                <thead>
+                    <tr class="bg-gray-100">
+                        <th class="border p-2 text-left">Supplier Name</th>
+                        <th class="border p-2 text-left">Phone 1</th>
+                        <th class="border p-2 text-left">Phone 2</th>
+                        <th class="border p-2 text-left">Email</th>
+                        <th class="border p-2 text-left">Address</th>
+                        <th class="border p-2 text-left">Create Date</th>
+                        <th class="border p-2 text-left">Created By</th>
+                        <th class="border p-2 text-left">Create Remarks</th>
+                        <th class="border p-2 text-right">Number of POs</th>
+                        <th class="border p-2 text-right">Total Purchases</th>
+                        <th class="border p-2 text-right">Total Paid</th>
+                        <th class="border p-2 text-right">Outstanding Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for purchase in purchases %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="border p-2">{{ purchase.supplier_name }}</td>
+                            <td class="border p-2">{{ purchase.phone_1|default:"-" }}</td>
+                            <td class="border p-2">{{ purchase.phone_2|default:"-" }}</td>
+                            <td class="border p-2">{{ purchase.email|default:"-" }}</td>
+                            <td class="border p-2">{{ purchase.address|default:"-" }}</td>
+                            <td class="border p-2">{{ purchase.create_dt|date:"Y-m-d"|default:"-" }}</td>
+                            <td class="border p-2">{{ purchase.create_by|default:"-" }}</td>
+                            <td class="border p-2">{{ purchase.create_remarks|default:"-" }}</td>
+                            <td class="border p-2 text-right">{{ purchase.number_of_pos|default:"0" }}</td>
+                            <td class="border p-2 text-right">{{ purchase.total_purchases|floatformat:2|default:"0.00" }}</td>
+                            <td class="border p-2 text-right">{{ purchase.total_paid|floatformat:2|default:"0.00" }}</td>
+                            <td class="border p-2 text-right">{{ purchase.total_balance|floatformat:2|default:"0.00" }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="12" class="border p-2 text-center text-gray-500">No purchase data found.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="bg-gray-100 font-bold">
+                        <td class="border p-2 text-left" colspan="8">Total</td>
+                        <td class="border p-2 text-right">{{ total_pos|default:"0" }}</td>
+                        <td class="border p-2 text-right">{{ total_purchases_sum|floatformat:2|default:"0.00" }}</td>
+                        <td class="border p-2 text-right">{{ total_paid_sum|floatformat:2|default:"0.00" }}</td>
+                        <td class="border p-2 text-right">{{ total_balance_sum|floatformat:2|default:"0.00" }}</td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            <p class="mt-6 text-xs text-right text-gray-500">
+                Report generated on {% now "F j, Y" %} by {{ username }}
+            </p>
+        </div>
+    </div>
+
+    <script>
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const startDate = document.getElementById('start_date').value;
+            const endDate = document.getElementById('end_date').value;
+            const today = new Date().toISOString().split('T')[0];
+
+            if (!startDate || !endDate) {
+                e.preventDefault();
+                alert('Please select both start and end dates.');
+                return;
+            }
+
+            if (startDate > endDate) {
+                e.preventDefault();
+                alert('Start date cannot be after end date.');
+                return;
+            }
+
+            if (endDate > today) {
+                e.preventDefault();
+                alert('End date cannot be in the future.');
+                return;
+            }
+        });
+
+        function printReport() {
+            window.print();
+        }
+
+        function exportToExcel() {
+            const table = document.getElementById('purchaseTable');
+            const wb = XLSX.utils.table_to_book(table, { sheet: "Purchase Report" });
+            const filename = 'Purchase_by_Supplier_{{ start_date|date:"Y-m-d" }}_to_{{ end_date|date:"Y-m-d" }}.xlsx';
+            XLSX.writeFile(wb, filename);
+        }
+    </script>
+</body>
+{% endblock %}
+

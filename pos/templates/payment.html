@@ -1,0 +1,358 @@
+
+         <!DOCTYPE html>
+         <html lang="en">
+         <head>
+             <meta charset="UTF-8">
+             <meta name="viewport" content="width=device-width, initial-scale=1.0">
+             <title>Process Payment</title>
+             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+             <style>
+                 :root {
+                     --primary-color: #3a7bd5;
+                     --primary-dark: #2d62b0;
+                     --secondary-color: #f5f7fa;
+                     --text-color: #2c3e50;
+                     --text-light: #6c757d;
+                     --success-color: #28a745;
+                     --error-color: #dc3545;
+                     --warning-color: #ffc107;
+                     --border-color: #e6e9ed;
+                     --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+                 }
+                 * {
+                     box-sizing: border-box;
+                     margin: 0;
+                     padding: 0;
+                 }
+                 body {
+                     font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+                     background-color: var(--secondary-color);
+                     color: var(--text-color);
+                     margin: 0;
+                     padding: 0;
+                     min-height: 100vh;
+                     display: flex;
+                     flex-direction: column;
+                     align-items: center;
+                     justify-content: center;
+                     line-height: 1.6;
+                 }
+                 .container {
+                     width: 100%;
+                     max-width: 550px;
+                     padding: 20px;
+                 }
+                 h1 {
+                     margin-bottom: 30px;
+                     font-size: 28px;
+                     font-weight: 600;
+                     color: var(--text-color);
+                     text-align: center;
+                     position: relative;
+                 }
+                 h1:after {
+                     content: '';
+                     position: absolute;
+                     bottom: -10px;
+                     left: 50%;
+                     transform: translateX(-50%);
+                     width: 60px;
+                     height: 3px;
+                     background-color: var(--primary-color);
+                     border-radius: 2px;
+                 }
+                 .messages {
+                     width: 100%;
+                     margin-bottom: 20px;
+                 }
+                 .messages p {
+                     padding: 12px 16px;
+                     border-radius: 6px;
+                     margin: 8px 0;
+                     font-size: 14px;
+                     display: flex;
+                     align-items: center;
+                 }
+                 .messages p:before {
+                     font-family: "Font Awesome 6 Free";
+                     font-weight: 900;
+                     margin-right: 10px;
+                 }
+                 .messages p.error {
+                     background-color: #ffeef0;
+                     color: var(--error-color);
+                     border-left: 4px solid var(--error-color);
+                 }
+                 .messages p.error:before {
+                     content: '\f06a';
+                 }
+                 .messages p.success {
+                     background-color: #ebf9f0;
+                     color: var(--success-color);
+                     border-left: 4px solid var(--success-color);
+                 }
+                 .messages p.success:before {
+                     content: '\f058';
+                 }
+                 .messages p.warning {
+                     background-color: #fff9e6;
+                     color: #9a7d2c;
+                     border-left: 4px solid var(--warning-color);
+                 }
+                 .messages p.warning:before {
+                     content: '\f071';
+                 }
+                 .card {
+                     background-color: #fff;
+                     padding: 30px;
+                     border-radius: 12px;
+                     width: 100%;
+                     box-shadow: var(--shadow);
+                     margin-bottom: 25px;
+                     transition: transform 0.2s ease, box-shadow 0.2s ease;
+                 }
+                 .card:hover {
+                     transform: translateY(-2px);
+                     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+                 }
+                 .payment-summary {
+                     margin-bottom: 25px;
+                     border-radius: 8px;
+                     overflow: hidden;
+                 }
+                 .payment-summary .header {
+                     background-color: var(--primary-color);
+                     color: white;
+                     padding: 15px 20px;
+                     font-weight: 600;
+                     font-size: 16px;
+                     display: flex;
+                     align-items: center;
+                 }
+                 .payment-summary .header i {
+                     margin-right: 10px;
+                 }
+                 .payment-summary .content {
+                     padding: 15px 20px;
+                     background-color: white;
+                 }
+                 .payment-summary .row {
+                     display: flex;
+                     justify-content: space-between;
+                     padding: 12px 0;
+                     border-bottom: 1px solid #f0f0f0;
+                 }
+                 .payment-summary .row:last-child {
+                     border-bottom: none;
+                     padding-top: 15px;
+                     margin-top: 5px;
+                     border-top: 2px solid #f0f0f0;
+                     font-weight: 700;
+                     font-size: 18px;
+                 }
+                 .payment-summary .label {
+                     font-weight: 500;
+                     color: var(--text-light);
+                 }
+                 .payment-summary .value {
+                     font-weight: 600;
+                     color: var(--text-color);
+                 }
+                 .payment-summary input[type="number"] {
+                     width: 100px;
+                     padding: 8px;
+                     border: 1px solid var(--border-color);
+                     border-radius: 4px;
+                     font-size: 16px;
+                     text-align: right;
+                 }
+                 .payment-summary input.receivable-input {
+                     width: 130px;
+                     font-weight: 700;
+                     font-size: 25px;
+                 }
+                 form label {
+                     font-weight: 500;
+                     display: block;
+                     margin-bottom: 10px;
+                     color: var(--text-color);
+                 }
+                 form input[type="text"], form textarea {
+                     width: 100%;
+                     padding: 12px 15px;
+                     margin-bottom: 25px;
+                     border-radius: 6px;
+                     border: 1px solid var(--border-color);
+                     font-size: 15px;
+                     background-color: white;
+                     color: var(--text-color);
+                 }
+                 form select {
+                     width: 100%;
+                     padding: 12px 15px;
+                     margin-bottom: 25px;
+                     border-radius: 6px;
+                     border: 1px solid var(--border-color);
+                     font-size: 15px;
+                     background-color: white;
+                     color: var(--text-color);
+                     transition: border-color 0.2s ease, box-shadow 0.2s ease;
+                     appearance: none;
+                     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236c757d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+                     background-repeat: no-repeat;
+                     background-position: right 15px center;
+                     background-size: 16px;
+                 }
+                 form select:focus, form input:focus, form textarea:focus {
+                     outline: none;
+                     border-color: var(--primary-color);
+                     box-shadow: 0 0 0 3px rgba(58, 123, 213, 0.15);
+                 }
+                 button {
+                     width: 100%;
+                     padding: 14px;
+                     background-color: var(--primary-color);
+                     color: white;
+                     font-size: 16px;
+                     font-weight: 600;
+                     border: none;
+                     border-radius: 6px;
+                     cursor: pointer;
+                     transition: all 0.2s ease;
+                     display: flex;
+                     justify-content: center;
+                     align-items: center;
+                 }
+                 button:hover:not(:disabled) {
+                     background-color: var(--primary-dark);
+                     transform: translateY(-1px);
+                     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                 }
+                 button:active:not(:disabled) {
+                     transform: translateY(1px);
+                     box-shadow: none;
+                 }
+                 button:disabled {
+                     background-color: #cbd5e0;
+                     cursor: not-allowed;
+                 }
+                 button i {
+                     margin-right: 8px;
+                 }
+                 a.cancel-link {
+                     display: inline-block;
+                     margin-top: 5px;
+                     color: var(--text-light);
+                     font-weight: 500;
+                     text-decoration: none;
+                     font-size: 14px;
+                     transition: color 0.2s ease;
+                     text-align: center;
+                     width: 100%;
+                 }
+                 a.cancel-link:hover {
+                     color: var(--error-color);
+                 }
+                 a.cancel-link i {
+                     margin-right: 5px;
+                 }
+                 .secure-badge {
+                     display: flex;
+                     align-items: center;
+                     justify-content: center;
+                     margin-top: 25px;
+                     color: var(--text-light);
+                     font-size: 14px;
+                 }
+                 .secure-badge i {
+                     margin-right: 8px;
+                     color: var(--success-color);
+                 }
+             </style>
+         </head>
+         <body>
+             <div class="container">
+                 <h1>Process Payment</h1>
+         
+                 {% comment %}
+                     Context - sale_no: {{ sale.sale_no }}
+                     total_amount: {{ total_amount|floatformat:3 }}
+                     balance: {{ balance|floatformat:3 }}
+                     paid_amount: {{ paid_amount|floatformat:3 }}
+                     payment_status: {{ sale.payment_status }}
+                 {% endcomment %}
+         
+                 {% if messages %}
+                     <div class="messages">
+                         {% for message in messages %}
+                             <p class="{{ message.tags }}">{{ message }}</p>
+                         {% endfor %}
+                     </div>
+                 {% endif %}
+         
+                 <form method="POST" action="{% url 'confirm_payment' %}" class="card">
+                     {% csrf_token %}
+                     <input type="hidden" name="sale_id" value="{{ sale.sale_id }}">
+                     <input type="hidden" name="total_amount" value="{{ total_amount|floatformat:3 }}">
+         
+                     <div class="payment-summary">
+                         <div class="header">
+                             <i class="fas fa-receipt"></i> Bill Summary (Receivables)
+                         </div>
+                         <div class="content">
+                             <div class="row">
+                                 <span class="label">Sale No:</span>
+                                 <span class="value">{{ sale.get_sale_no }}</span>
+                             </div>
+                             <div class="row">
+                                 <span class="label">Bill Amount:</span>
+                                 <span class="value">{{ total_amount|floatformat:3 }}</span>
+                             </div>
+                             {% if sale.payment_status == 'Partially Paid' %}
+                                 <div class="row">
+                                     <span class="label">Paid Amount:</span>
+                                     <span class="value">{{ paid_amount|floatformat:3|default:"0.000" }}</span>
+                                 </div>
+                                 <div class="row">
+                                     <span class="label">Balance Due:</span>
+                                     <span class="value">{{ balance|floatformat:3|default:total_amount|floatformat:3 }}</span>
+                                 </div>
+                             {% endif %}
+                             <div class="row">
+                                 <span class="label">Receivable Amount:</span>
+                                 <input type="number" name="net_amount" class="value receivable-input" value="{{ balance|default:total_amount|floatformat:3 }}" step="0.001" min="0" max="{{ balance|default:total_amount|floatformat:3 }}" required>
+                             </div>
+                         </div>
+                     </div>
+         
+                     <label for="payment_method">Payment Method:</label>
+                     <select name="payment_method" id="payment_method" required>
+                         <option value="" disabled selected>Select Payment Method</option>
+                         {% for account in payment_accounts %}
+                             <option value="{{ account.category_id }}">{{ account.category_name }}</option>
+                         {% empty %}
+                             <option value="" disabled selected>No payment methods available</option>
+                         {% endfor %}
+                     </select>
+         
+                     <label for="card_no">Card Number (Optional):</label>
+                     <input type="text" name="card_no" id="card_no" placeholder="e.g., XXXX-XXXX-XXXX-1234">
+         
+                     <label for="remarks">Remarks (Optional):</label>
+                     <textarea name="remarks" id="remarks" placeholder="Enter any additional remarks"></textarea>
+         
+                     <button type="submit" {% if not payment_accounts %}disabled{% endif %}>
+                         <i class="fas fa-credit-card"></i> Confirm Payment
+                     </button>
+                 </form>
+         
+                 <a href="{% url 'view_order' %}" class="cancel-link">
+                     <i class="fas fa-arrow-left"></i> Cancel and return to order
+                 </a>
+         
+                 <div class="secure-badge">
+                     <i class="fas fa-lock"></i> Secure Payment Processing
+                 </div>
+             </div>
+         </body>
+         </html>

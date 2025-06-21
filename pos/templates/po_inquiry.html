@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Purchase Order Inquiry</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #purchase-order-table, #purchase-order-table * {
+                visibility: visible;
+            }
+            #purchase-order-table {
+                position: absolute;
+                left: 0;
+                top: 0;
+            }
+            .no-print {
+                display: none;
+            }
+        }
+        .hidden-row {
+            display: none;
+        }
+        .disabled-link {
+            color: #9ca3af;
+            cursor: not-allowed;
+            text-decoration: none;
+        }
+        .disabled-link:hover {
+            text-decoration: none;
+            color: #9ca3af;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-6">
+        <header class="flex justify-between items-center mb-6 no-print">
+            <h1 class="text-2xl font-bold">Purchase Order Inquiry</h1>
+        </header>
+
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6 no-print">
+            <form id="dateFilterForm" method="GET" class="flex space-x-4">
+                <div>
+                    <label for="start_date" class="block text-sm font-medium">Start Date</label>
+                    <input type="date" id="start_date" name="start_date" value="{{ start_date|date:'Y-m-d' }}"
+                           class="mt-1 p-2 border rounded-md">
+                </div>
+                <div>
+                    <label for="end_date" class="block text-sm font-medium">End Date</label>
+                    <input type="date" id="end_date" name="end_date" value="{{ end_date|date:'Y-m-d' }}"
+                           class="mt-1 p-2 border rounded-md">
+                </div>
+                <div class="flex items-end">
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                        Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        {% if messages %}
+            <div class="mb-6 no-print">
+                {% for message in messages %}
+                    <div class="bg-red-100 text-red-700 p-4 rounded-md">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex justify-between items-center mb-4 no-print">
+                <h2 class="text-xl font-semibold">Purchase Orders</h2>
+                <div class="space-x-2">
+                    <button onclick="printTable()" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
+                        Print Table
+                    </button>
+                    <button onclick="exportToExcel()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
+                        Export to Excel
+                    </button>
+                    <button onclick="resetFilters()" class="bg-gray-400 text-white px-4 py-2 rounded-md hover:bg-gray-500">
+                        Reset Filters
+                    </button>
+                </div>
+            </div>
+            <div id="table-container">
+                <table id="purchase-order-table" class="w-full border-collapse">
+                    <thead>
+                        <tr class="bg-gray-200">
+                            <th class="border p-2 text-left">PO Number</th>
+                            <th class="border p-2 text-left">Supplier</th>
+                            <th class="border p-2 text-right">Total Amount</th>
+                            <th class="border p-2 text-right">Paid Amount</th>
+                            <th class="border p-2 text-right">Balance Due</th>
+                            <th class="border p-2 text-center">Payment Status</th>
+                            <th class="border p-2 text-center">Order Items Count</th>
+                            <th class="border p-2 text-center no-print">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="po-table-body">
+                        {% for po in purchase_orders %}
+                            <tr class="po-row" data-order-date="{{ po.order_date|date:'Y-m-d' }}">
+                                <td class="border p-2">
+                                    <a href="{% url 'po_detail' po.poid %}" class="text-blue-600 hover:underline">{{ po.pono }}</a>
+                                </td>
+                                <td class="border p-2">{{ po.supplier.supplier_name }}</td>
+                                <td class="border p-2 text-right" data-value="{{ po.total_amount|default:'0' }}">{{ po.total_amount|floatformat:2|default:"0.00" }}</td>
+                                <td class="border p-2 text-right" data-value="{{ po.paid_amount|default:'0' }}">{{ po.paid_amount|floatformat:2|default:"0.00" }}</td>
+                                <td class="border p-2 text-right" data-value="{{ po.balance|default:'0' }}">{{ po.balance|floatformat:2|default:"0.00" }}</td>
+                                <td class="border p-2 text-center">
+                                    <span class="inline-block px-2 py-1 rounded-full text-xs font-semibold
+                                        {% if po.postatus == 'Paid' %}bg-green-500 text-white
+                                        {% elif po.postatus == 'Unpaid' %}bg-red-500 text-white
+                                        {% elif po.postatus == 'Partially Paid' %}bg-yellow-500 text-white
+                                        {% else %}bg-gray-500 text-white{% endif %}">
+                                        {{ po.postatus|default:"Unpaid" }}
+                                    </span>
+                                </td>
+                                <td class="border p-2 text-center" data-value="{{ po.items_list.count }}">{{ po.items_list.count }}</td>
+                                <td class="border p-2 text-center no-print">
+                                    {% if po.postatus == 'Paid' %}
+                                        <span class="disabled-link">Fully Paid</span>
+                                    {% else %}
+                                        <a href="{% url 'supplier_payment' po.poid %}" class="text-blue-600 hover:underline">Make Payment</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr id="no-results-row">
+                                <td colspan="8" class="border p-2 text-center">No purchase orders found.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const startDate = urlParams.get('start_date');
+            const endDate = urlParams.get('end_date');
+            
+            if (startDate) {
+                document.getElementById('start_date').value = startDate;
+            }
+            if (endDate) {
+                document.getElementById('end_date').value = endDate;
+            }
+            if (startDate || endDate) {
+                filterTableByDate();
+            }
+        });
+
+        function resetFilters() {
+            document.getElementById('start_date').value = '';
+            document.getElementById('end_date').value = '';
+            window.location.href = window.location.pathname;
+        }
+
+        function filterTableByDate() {
+            const startDate = document.getElementById('start_date').value;
+            const endDate = document.getElementById('end_date').value;
+            const rows = document.querySelectorAll('.po-row');
+            let visibleCount = 0;
+
+            rows.forEach(row => {
+                const orderDate = row.getAttribute('data-order-date');
+                if (startDate && endDate) {
+                    if (orderDate >= startDate && orderDate <= endDate) {
+                        row.classList.remove('hidden-row');
+                        visibleCount++;
+                    } else {
+                        row.classList.add('hidden-row');
+                    }
+                } else if (startDate) {
+                    if (orderDate >= startDate) {
+                        row.classList.remove('hidden-row');
+                        visibleCount++;
+                    } else {
+                        row.classList.add('hidden-row');
+                    }
+                } else if (endDate) {
+                    if (orderDate <= endDate) {
+                        row.classList.remove('hidden-row');
+                        visibleCount++;
+                    } else {
+                        row.classList.add('hidden-row');
+                    }
+                } else {
+                    row.classList.remove('hidden-row');
+                    visibleCount++;
+                }
+            });
+
+            const noResultsRow = document.getElementById('no-results-row');
+            if (visibleCount === 0) {
+                if (!noResultsRow) {
+                    const tbody = document.getElementById('po-table-body');
+                    const newRow = document.createElement('tr');
+                    newRow.id = 'no-results-row';
+                    newRow.innerHTML = '<td colspan="8" class="border p-2 text-center">No purchase orders found matching the date criteria.</td>';
+                    tbody.appendChild(newRow);
+                } else {
+                    noResultsRow.classList.remove('hidden-row');
+                }
+            } else if (noResultsRow) {
+                noResultsRow.classList.add('hidden-row');
+            }
+        }
+
+        document.getElementById('dateFilterForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            filterTableByDate();
+            const startDate = document.getElementById('start_date').value;
+            const endDate = document.getElementById('end_date').value;
+            const url = new URL(window.location);
+            if (startDate) {
+                url.searchParams.set('start_date', startDate);
+            } else {
+                url.searchParams.delete('start_date');
+            }
+            if (endDate) {
+                url.searchParams.set('end_date', endDate);
+            } else {
+                url.searchParams.delete('end_date');
+            }
+            window.history.pushState({}, '', url);
+        });
+
+        function printTable() {
+            window.print();
+        }
+
+        function exportToExcel() {
+            const wb = XLSX.utils.book_new();
+            const tableData = [];
+            const headerRow = [];
+            const headerCells = document.querySelectorAll('#purchase-order-table thead th');
+            headerCells.forEach(cell => {
+                if (!cell.classList.contains('no-print')) {
+                    headerRow.push(cell.textContent.trim());
+                }
+            });
+            tableData.push(headerRow);
+
+            const rows = document.querySelectorAll('#purchase-order-table tbody tr:not(.hidden-row)');
+            rows.forEach(row => {
+                if (row.cells.length > 1) {
+                    const dataRow = [];
+                    Array.from(row.cells).forEach((cell, index) => {
+                        if (!cell.classList.contains('no-print')) {
+                            if ([2, 3, 4].includes(index) && cell.hasAttribute('data-value')) {
+                                const value = cell.getAttribute('data-value');
+                                dataRow.push(value === "" ? 0 : parseFloat(value));
+                            } else if (index === 6) {
+                                const value = cell.getAttribute('data-value');
+                                dataRow.push(value === "" ? 0 : parseInt(value));
+                            } else {
+                                dataRow.push(cell.textContent.trim());
+                            }
+                        }
+                    });
+                    tableData.push(dataRow);
+                }
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(tableData);
+            const columnFormats = [
+                {wch: 15}, // PO Number
+                {wch: 30}, // Supplier
+                {wch: 15}, // Total Amount
+                {wch: 15}, // Paid Amount
+                {wch: 15}, // Balance Due
+                {wch: 15}, // Payment Status
+                {wch: 15}  // Order Items Count
+            ];
+            ws['!cols'] = columnFormats;
+            XLSX.utils.book_append_sheet(wb, ws, "Purchase Orders");
+            XLSX.writeFile(wb, "purchase_order_inquiry.xlsx");
+        }
+    </script>
+</body>
+{% endblock %}

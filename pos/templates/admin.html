@@ -1,0 +1,412 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block page_title %}Admin Dashboard{% endblock %}
+
+{% block extra_styles %}
+    <style>
+    
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+        }
+        
+        .panel {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            margin-bottom: 24px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            overflow: hidden;
+        }
+        
+        .panel:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+        }
+        
+        .panel-header {
+            padding: 18px 20px;
+            border-bottom: 1px solid #e0e6ed;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #fafbfc;
+        }
+        
+        .panel-title {
+            font-weight: 600;
+            font-size: 16px;
+            color: #2c3e50;
+        }
+        
+        .panel-content {
+            padding: 20px;
+        }
+        
+        .model-list {
+            list-style: none;
+        }
+        
+        .model-item {
+            padding: 12px 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e0e6ed;
+            transition: background-color 0.2s;
+        }
+        
+        .model-item:hover {
+            background-color: #f8fafd;
+        }
+        
+        .model-item:last-child {
+            border-bottom: none;
+        }
+        
+        .model-name {
+            color: #0366d6;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        
+        .model-name:hover {
+            color: #0247a3;
+            text-decoration: underline;
+        }
+        
+        .model-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .model-actions a {
+            padding: 4px 8px;
+            color: #1eb16d;
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 500;
+            border-radius: 4px;
+            transition: background-color 0.2s, color 0.2s;
+            background-color: rgba(30, 177, 109, 0.1);
+        }
+        
+        .model-actions a:hover {
+            background-color: rgba(30, 177, 109, 0.2);
+            color: #158e58;
+        }
+        
+        .business-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        
+        .business-details p {
+            margin: 8px 0;
+            color: #4d5b75;
+        }
+        
+        .business-details strong {
+            color: #2c3e50;
+            font-weight: 500;
+        }
+        
+        .recent-activity-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #e0e6ed;
+        }
+        
+        .recent-activity-item:last-child {
+            border-bottom: none;
+        }
+        
+        .recent-activity-icon {
+            margin-right: 12px;
+            font-size: 16px;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background-color: rgba(40, 167, 69, 0.1);
+            color: #28a745;
+        }
+        
+        .recent-activity-text {
+            color: #4d5b75;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+        
+        .timestamp {
+            font-size: 12px;
+            color: #8895a7;
+            margin-top: 2px;
+        }
+        
+        .action-button {
+            padding: 8px 14px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .btn-primary {
+            background-color: #1eb16d;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #169c5f;
+        }
+        
+        .btn-secondary {
+            background-color: #f0f2f5;
+            color: #4d5b75;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #e4e7ec;
+        }
+        
+        .stats-box {
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+        }
+        
+        .stats-box h4 {
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        
+        .stats-box p {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .stats-green {
+            background-color: #e8f5e9;
+        }
+        
+        .stats-green h4 {
+            color: #2e7d32;
+        }
+        
+        .stats-green p {
+            color: #1b5e20;
+        }
+        
+        .stats-blue {
+            background-color: #e3f2fd;
+        }
+        
+        .stats-blue h4 {
+            color: #1565c0;
+        }
+        
+        .stats-blue p {
+            color: #0d47a1;
+        }
+        
+        .stats-orange {
+            background-color: #fff3e0;
+        }
+        
+        .stats-orange h4 {
+            color: #e65100;
+        }
+        
+        .stats-orange p {
+            color: #bf360c;
+        }
+        
+        .menu-group {
+            margin-bottom: 24px;
+        }
+        
+        .menu-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 12px;
+        }
+        
+        @media (max-width: 992px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+
+
+    <div class="dashboard-grid">
+        <div class="left-column">
+            
+            <div class="menu-group">
+                <div class="menu-title"><i class="fas fa-cubes"></i> Master</div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <div class="panel-title">Product Groups</div>
+                        <button class="action-button btn-secondary"><i class="fas fa-eye"></i> View All</button>
+                    </div>
+                    <div class="panel-content">
+                        <ul class="model-list">
+                            <li class="model-item">
+                                <span class="model-name">Product Groups</span>
+                                <div class="model-actions">
+                                    <a href="{% url 'productgroup_add' %}"><i class="fas fa-plus"></i> Add</a>
+                                    <a href="{% url 'productgroup_list' %}"><i class="fas fa-edit"></i> Modify</a>
+                                    <a href="{% url 'productgroup_list' %}"><i class="fas fa-trash"></i> Delete</a>
+                                    <a href="{% url 'productgroup_inquiry' %}"><i class="fas fa-search"></i> Inquiry</a>
+                                    <a href="{% url 'productgroup_dashboard' %}"><i class="fas fa-chart-bar"></i> Dashboard</a>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+        
+            <div class="menu-group">
+                
+                <div class="menu-title"><i class="fas fa-shopping-cart"></i> Sales</div>
+                <div class="panel">
+                    <div class="panel-header">
+                        <div class="panel-title">Products</div>
+                        <button class="action-button btn-secondary"><i class="fas fa-eye"></i> View All</button>
+                    </div>
+                    <div class="panel-content">
+                        <ul class="model-list">
+                            <li class="model-item">
+                                <span class="model-name">Products</span>
+                                <div class="model-actions">
+                                    <a href="{% url 'product_add' %}"><i class="fas fa-plus"></i> Add</a>
+                                    <a href="{% url 'product_list' %}"><i class="fas fa-edit"></i> Modify</a>
+                                    <a href="{% url 'product_list' %}"><i class="fas fa-trash"></i> Delete</a>
+                                    <a href="{% url 'product_inquiry' %}"><i class="fas fa-search"></i> Inquiry</a>
+                                    <a href="{% url 'product_dashboard' %}"><i class="fas fa-chart-bar"></i> Dashboard</a>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+        <div class="menu-group">      
+
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title">Suppliers</div>
+                    <button class="action-button btn-secondary"><i class="fas fa-eye"></i> View All</button>
+                </div>
+                <div class="panel-content">
+                    <ul class="model-list">
+                        <li class="model-item">
+                            <span class="model-name">Suppliers</span>
+                            <div class="model-actions">
+                                <a href="{% url 'supplier_add' %}"><i class="fas fa-plus"></i> Add</a>
+                                <a href="{% url 'supplier_list' %}"><i class="fas fa-edit"></i> Modify</a>
+                                {% comment %} <a href="{% url 'supplier_list' %}"><i class="fas fa-trash"></i> Delete</a> {% endcomment %}
+                                <a href="{% url 'supplier_inquiry' %}"><i class="fas fa-search"></i> Inquiry</a>
+                                <a href="{% url 'supplier_dashboard' %}"><i class="fas fa-chart-bar"></i> Dashboard</a>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+        </div>
+
+            
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title"><i class="fas fa-info-circle"></i> Business Unit Details</div>
+                </div>
+                <div class="panel-content">
+                    <div class="business-details">
+                        <p><strong>SAAS Customer:</strong> {{ saas_customer.saas_customer_name }}</p>
+                        <p><strong>Business Unit Group:</strong> {{ business_unit_group.business_unit_group_name }}</p>
+                        <p><strong>Business Unit:</strong> {{ business_unit.business_unit_name }}</p>
+                        <p><strong>Branch:</strong> {{ branch.branch_name }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="right-column">
+            {% comment %} <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title"><i class="fas fa-history"></i> Recent Actions</div>
+                </div>
+                <div class="panel-content">
+                    <div class="recent-activity-item">
+                        <div class="recent-activity-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div>
+                            <span class="recent-activity-text">Changed Product image.</span>
+                            <div class="timestamp">3 days, 16 hours ago</div>
+                        </div>
+                    </div>
+                    <div class="recent-activity-item">
+                        <div class="recent-activity-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div>
+                            <span class="recent-activity-text">Changed Flag stock out.</span>
+                            <div class="timestamp">3 days, 16 hours ago</div>
+                        </div>
+                    </div>
+                    <div class="recent-activity-item">
+                        <div class="recent-activity-icon">
+                            <i class="fas fa-plus-circle"></i>
+                        </div>
+                        <div>
+                            <span class="recent-activity-text">Added "Suppliers object (1)".</span>
+                            <div class="timestamp">3 days, 16 hours ago</div>
+                        </div>
+                    </div>
+                </div>
+            </div> {% endcomment %}
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title"><i class="fas fa-chart-pie"></i> Quick Stats</div>
+                </div>
+                <div class="panel-content">
+                    <div class="stats-box stats-green">
+                        <h4>Products</h4>
+                        <p>{{ products_count|default:"0" }}</p>
+                    </div>
+                    <div class="stats-box stats-blue">
+                        <h4>Customers</h4>
+                        <p>{{ customers_count|default:"0" }}</p>
+                    </div>
+                    <div class="stats-box stats-orange">
+                        <h4>Suppliers</h4>
+                        <p>{{ supplier_count|default:"0" }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+

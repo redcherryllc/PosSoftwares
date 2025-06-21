@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block content %}
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>General Ledger Report</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #ledger-table, #ledger-table * {
+                visibility: visible;
+            }
+            #ledger-table {
+                position: absolute;
+                left: 0;
+                top: 0;
+            }
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-6">
+        <header class="flex justify-between items-center mb-6 no-print">
+            <h1 class="text-2xl font-bold">General Ledger Report</h1>
+            {% comment %} <div class="flex items-center space-x-4">
+                <span>Welcome, {{ username }}</span>
+                <a href="{% url 'logout' %}" class="text-blue-600 hover:underline">Logout</a>
+            </div> {% endcomment %}
+        </header>
+
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6 no-print">
+            <form method="GET" class="flex space-x-4">
+                <div>
+                    <label for="start_date" class="block text-sm font-medium">Start Date</label>
+                    <input type="date" id="start_date" name="start_date" value="{{ start_date|date:'Y-m-d' }}"
+                           class="mt-1 p-2 border rounded-md">
+                </div>
+                <div>
+                    <label for="end_date" class="block text-sm font-medium">End Date</label>
+                    <input type="date" id="end_date" name="end_date" value="{{ end_date|date:'Y-m-d' }}"
+                           class="mt-1 p-2 border rounded-md">
+                </div>
+                <div class="flex items-end">
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                        Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        {% if messages %}
+            <div class="mb-6 no-print">
+                {% for message in messages %}
+                    <div class="bg-red-100 text-red-700 p-4 rounded-md">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex justify-between items-center mb-4 no-print">
+                <h2 class="text-xl font-semibold">{{ business_unit.business_unit_name }}</h2>
+                <div class="space-x-2">
+                    <button onclick="printTable()" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
+                        Print Table
+                    </button>
+                    <button onclick="exportToExcel()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
+                        Export to Excel
+                    </button>
+                </div>
+            </div>
+            <div id="table-container">
+                <table id="ledger-table" class="w-full border-collapse">
+                    <thead>
+                        <tr class="bg-gray-200">
+                            <th class="border p-2 text-left">Journal ID</th>
+                            <th class="border p-2 text-left">Date</th>
+                            <th class="border p-2 text-left">Reference</th>
+                            <th class="border p-2 text-left">Account Code</th>
+                            <th class="border p-2 text-left">Account Name</th>
+                            <th class="border p-2 text-left">Remarks</th>
+                            <th class="border p-2 text-right">Debit</th>
+                            <th class="border p-2 text-right">Credit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in entries %}
+                            {% for line in entry.journalentryline_set.all %}
+                                <tr>
+                                    <td class="border p-2">{{ entry.journal_entry_id }}</td>
+                                    <td class="border p-2" data-date="{{ entry.journal_entry_date|date:'Y-m-d' }}">{{ entry.journal_entry_date|date:"Y-m-d" }}</td>
+                                    <td class="border p-2">{{ entry.reference }}</td>
+                                    <td class="border p-2">{{ line.account.account_code }}</td>
+                                    <td class="border p-2">{{ line.account.account_name }}</td>
+                                    <td class="border p-2">{{ line.create_remarks }}</td>
+                                    <td class="border p-2 text-right">{{ line.debit|floatformat:2 }}</td>
+                                    <td class="border p-2 text-right">{{ line.credit|floatformat:2 }}</td>
+                                </tr>
+                            {% endfor %}
+                        {% empty %}
+                            <tr>
+                                <td colspan="8" class="border p-2 text-center">No entries found.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function printTable() {
+            window.print();
+        }
+
+        function exportToExcel() {
+            const wb = XLSX.utils.book_new();
+            
+            const tableData = [];
+            
+            const headerRow = [];
+            const headerCells = document.querySelectorAll('#ledger-table thead th');
+            headerCells.forEach(cell => {
+                headerRow.push(cell.textContent.trim());
+            });
+            tableData.push(headerRow);
+            
+            const rows = document.querySelectorAll('#ledger-table tbody tr');
+            rows.forEach(row => {
+                if (row.cells.length > 1) {  
+                    const dataRow = [];
+                    Array.from(row.cells).forEach((cell, index) => {
+                        if (index === 1 && cell.hasAttribute('data-date')) {
+                            dataRow.push(cell.getAttribute('data-date'));
+                        } else if (index === 6 || index === 7) {
+                            
+                            const value = cell.textContent.trim();
+                            dataRow.push(value === "" ? 0 : parseFloat(value));
+                        } else {
+                            dataRow.push(cell.textContent.trim());
+                        }
+                    });
+                    tableData.push(dataRow);
+                }
+            });
+            
+    
+            const ws = XLSX.utils.aoa_to_sheet(tableData);
+            
+            
+            const columnFormats = [
+                {wch: 15}, 
+                {wch: 12}, 
+                {wch: 15}, 
+                {wch: 15}, 
+                {wch: 25}, 
+                {wch: 30}, 
+                {wch: 12}, 
+                {wch: 12}  
+            ];
+            ws['!cols'] = columnFormats;
+            
+            
+            XLSX.utils.book_append_sheet(wb, ws, "General Ledger");
+            
+        
+            XLSX.writeFile(wb, "general_ledger_report.xlsx");
+        }
+    </script>
+</body>
+{% endblock content %}

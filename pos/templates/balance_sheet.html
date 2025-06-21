@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block content %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Balance Sheet</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #balance-sheet-tables, #balance-sheet-tables * {
+                visibility: visible;
+            }
+            #balance-sheet-tables {
+                position: absolute;
+                left: 0;
+                top: 0;
+            }
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-6">
+        <header class="flex justify-between items-center mb-6 no-print">
+            <h1 class="text-2xl font-bold">Balance Sheet</h1>
+        </header>
+
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6 no-print">
+            <form method="GET" class="flex space-x-4">
+                <div>
+                    <label for="start_date" class="block text-sm font-medium">Start Date</label>
+                    <input type="date" id="start_date" name="start_date" value="{{ start_date|date:'Y-m-d' }}"
+                           class="mt-1 p-2 border rounded-md">
+                </div>
+                <div>
+                    <label for="end_date" class="block text-sm font-medium">End Date</label>
+                    <input type="date" id="end_date" name="end_date" value="{{ end_date|date:'Y-m-d' }}"
+                           class="mt-1 p-2 border rounded-md">
+                </div>
+                <div class="flex items-end">
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                        Filter
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        {% if messages %}
+            <div class="mb-6 no-print">
+                {% for message in messages %}
+                    <div class="bg-red-100 text-red-700 p-4 rounded-md">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <div class="flex justify-between items-center mb-4 no-print">
+                <h2 class="text-xl font-semibold">{{ business_unit.business_unit_name|default:"Business Unit" }}</h2>
+                <div class="space-x-2">
+                    <button onclick="printTables()" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
+                        Print Tables
+                    </button>
+                    <button onclick="exportToExcel()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
+                        Export to Excel
+                    </button>
+                </div>
+            </div>
+            
+            <div id="balance-sheet-tables">
+                {% if start_date or end_date %}
+                    <p class="mb-4">
+                        {% if start_date and end_date %}
+                            Period: {{ start_date|date:"F d, Y" }} to {{ end_date|date:"F d, Y" }}
+                        {% elif start_date %}
+                            Period: From {{ start_date|date:"F d, Y" }}
+                        {% elif end_date %}
+                            Period: Up to {{ end_date|date:"F d, Y" }}
+                        {% endif %}
+                    </p>
+                {% endif %}
+
+                <h3 class="text-lg font-medium mb-2">Assets</h3>
+                <table id="assets-table" class="w-full border-collapse mb-4">
+                    <thead>
+                        <tr class="bg-gray-200">
+                            <th class="border p-2 text-left">Account Name</th>
+                            <th class="border p-2 text-right">Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for asset in assets %}
+                            <tr>
+                                <td class="border p-2">{{ asset.account_name }}</td>
+                                <td class="border p-2 text-right {% if asset.account_balance < 0 %}text-red-600{% endif %}" 
+                                    data-value="{{ asset.account_balance }}">{{ asset.account_balance|floatformat:2 }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="2" class="border p-2 text-center">No assets found.</td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="font-bold">
+                            <td class="border p-2">Total Assets</td>
+                            <td class="border p-2 text-right {% if total_assets < 0 %}text-red-600{% endif %}" 
+                                data-value="{{ total_assets }}">{{ total_assets|floatformat:2 }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3 class="text-lg font-medium mb-2">Liabilities</h3>
+                <table id="liabilities-table" class="w-full border-collapse mb-4">
+                    <thead>
+                        <tr class="bg-gray-200">
+                            <th class="border p-2 text-left">Account Name</th>
+                            <th class="border p-2 text-right">Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for liability in liabilities %}
+                            <tr>
+                                <td class="border p-2">{{ liability.account_name }}</td>
+                                <td class="border p-2 text-right {% if liability.account_balance < 0 %}text-red-600{% endif %}" 
+                                    data-value="{{ liability.account_balance }}">{{ liability.account_balance|floatformat:2 }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="2" class="border p-2 text-center">No liabilities found.</td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="font-bold">
+                            <td class="border p-2">Total Liabilities</td>
+                            <td class="border p-2 text-right {% if total_liabilities < 0 %}text-red-600{% endif %}" 
+                                data-value="{{ total_liabilities }}">{{ total_liabilities|floatformat:2 }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3 class="text-lg font-medium mb-2">Equity</h3>
+                <table id="equity-table" class="w-full border-collapse mb-4">
+                    <thead>
+                        <tr class="bg-gray-200">
+                            <th class="border p-2 text-left">Account Name</th>
+                            <th class="border p-2 text-right">Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for eq in equity %}
+                            <tr>
+                                <td class="border p-2">{{ eq.account_name }}</td>
+                                <td class="border p-2 text-right {% if eq.account_balance < 0 %}text-red-600{% endif %}" 
+                                    data-value="{{ eq.account_balance }}">{{ eq.account_balance|floatformat:2 }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="2" class="border p-2 text-center">No equity accounts found.</td>
+                            </tr>
+                        {% endfor %}
+                        <tr class="font-bold">
+                            <td class="border p-2">Total Equity</td>
+                            <td class="border p-2 text-right {% if total_equity < 0 %}text-red-600{% endif %}" 
+                                data-value="{{ total_equity }}">{{ total_equity|floatformat:2 }}</td>
+                        </tr>
+                        <tr class="font-bold">
+                            <td class="border p-2">Total Liabilities & Equity</td>
+                            <td class="border p-2 text-right {% if total_liabilities_equity < 0 %}text-red-600{% endif %}" 
+                                data-value="{{ total_liabilities_equity }}">{{ total_liabilities_equity|floatformat:2 }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function printTables() {
+            window.print();
+        }
+
+        function exportToExcel() {
+            const wb = XLSX.utils.book_new();
+            const companyName = document.querySelector('h2').textContent.trim();
+            const combinedData = [
+                [companyName],
+                ["Balance Sheet"],
+                {% if start_date or end_date %}
+                    ["Period: {% if start_date and end_date %}{{ start_date|date:'F d, Y' }} to {{ end_date|date:'F d, Y' }}{% elif start_date %}From {{ start_date|date:'F d, Y' }}{% else %}Up to {{ end_date|date:'F d, Y' }}{% endif %}"],
+                {% endif %}
+                [""],
+                ["Assets"]
+            ];
+            
+            const assetHeaders = [];
+            document.querySelectorAll('#assets-table thead th').forEach(th => assetHeaders.push(th.textContent.trim()));
+            combinedData.push(assetHeaders);
+            
+            const assetRows = document.querySelectorAll('#assets-table tbody tr');
+            assetRows.forEach(row => {
+                if (row.cells.length > 1) {
+                    const rowData = [];
+                    rowData.push(row.cells[0].textContent.trim());
+                    const balanceCell = row.cells[1];
+                    if (balanceCell.hasAttribute('data-value')) {
+                        rowData.push(parseFloat(balanceCell.getAttribute('data-value')));
+                    } else {
+                        rowData.push(balanceCell.textContent.trim());
+                    }
+                    combinedData.push(rowData);
+                }
+            });
+            
+            combinedData.push([""]);
+            combinedData.push(["Liabilities"]);
+            
+            const liabilityHeaders = [];
+            document.querySelectorAll('#liabilities-table thead th').forEach(th => liabilityHeaders.push(th.textContent.trim()));
+            combinedData.push(liabilityHeaders);
+            
+            const liabilityRows = document.querySelectorAll('#liabilities-table tbody tr');
+            liabilityRows.forEach(row => {
+                if (row.cells.length > 1) {
+                    const rowData = [];
+                    rowData.push(row.cells[0].textContent.trim());
+                    const balanceCell = row.cells[1];
+                    if (balanceCell.hasAttribute('data-value')) {
+                        rowData.push(parseFloat(balanceCell.getAttribute('data-value')));
+                    } else {
+                        rowData.push(balanceCell.textContent.trim());
+                    }
+                    combinedData.push(rowData);
+                }
+            });
+            
+            combinedData.push([""]);
+            combinedData.push(["Equity"]);
+            
+            const equityHeaders = [];
+            document.querySelectorAll('#equity-table thead th').forEach(th => equityHeaders.push(th.textContent.trim()));
+            combinedData.push(equityHeaders);
+            
+            const equityRows = document.querySelectorAll('#equity-table tbody tr');
+            equityRows.forEach(row => {
+                if (row.cells.length > 1) {
+                    const rowData = [];
+                    rowData.push(row.cells[0].textContent.trim());
+                    const balanceCell = row.cells[1];
+                    if (balanceCell.hasAttribute('data-value')) {
+                        rowData.push(parseFloat(balanceCell.getAttribute('data-value')));
+                    } else {
+                        rowData.push(balanceCell.textContent.trim());
+                    }
+                    combinedData.push(rowData);
+                }
+            });
+            
+            const ws = XLSX.utils.aoa_to_sheet(combinedData);
+            ws['!cols'] = [
+                {wch: 40'},
+                {wch: 15}
+            ];
+            
+            XLSX.utils.book_append_sheet(wb, ws, "Balance Sheet");
+            XLSX.writeFile(wb, "balance_sheet.xlsx");
+        }
+    </script>
+</body>
+{% endblock content %}

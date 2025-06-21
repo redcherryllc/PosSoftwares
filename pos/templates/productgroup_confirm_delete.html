@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1 class="page-title">Delete Product Group: {{ object.product_name }}</h1>
+    </div>
+
+    {% if messages %}
+        <div class="messages">
+            {% for message in messages %}
+                <p class="{{ message.tags }}">
+                    {% if message.tags == 'error' %}
+                        <i class="fas fa-exclamation-circle"></i>
+                    {% elif message.tags == 'success' %}
+                        <i class="fas fa-check-circle"></i>
+                    {% endif %}
+                    {{ message }}
+                </p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-trash"></i> Confirm Deletion</h2>
+        </div>
+        <p>Are you sure you want to delete the product group "{{ object.product_name }}"?</p>
+        <form method="POST">
+            {% csrf_token %}
+            <div class="btn-container">
+                <button type="submit" class="btn-danger">
+                    <i class="fas fa-trash"></i> Delete
+                </button>
+                <a href="{% url 'productgroup_list' %}" class="cancel-link">
+                    <i class="fas fa-arrow-left"></i> Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<style>
+    .container {
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 30px;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 30px;
+        border-bottom: 2px solid #eaeaea;
+        padding-bottom: 15px;
+    }
+    .page-title {
+        font-size: 28px;
+        color: #333;
+        margin: 0;
+    }
+    .messages {
+        margin-bottom: 25px;
+    }
+    .messages p {
+        padding: 12px 15px;
+        border-radius: 6px;
+        margin: 10px 0;
+    }
+    .messages .error {
+        background-color: #ffebee;
+        color: #c62828;
+        border-left: 4px solid #c62828;
+    }
+    .messages .success {
+        background-color: #e8f5e9;
+        color: #2e7d32;
+        border-left: 4px solid #2e7d32;
+    }
+    .card {
+        background: #ffffff;
+        padding: 30px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        margin-bottom: 25px;
+    }
+    .btn-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 30px;
+        gap: 20px;
+    }
+    .btn-danger {
+        padding: 12px 25px;
+        color: white;
+        background-color: #c62828;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 16px;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: background-color 0.2s;
+    }
+    .btn-danger:hover {
+        background-color: #b71c1c;
+    }
+    .cancel-link {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: #666;
+        text-decoration: none;
+        font-weight: 500;
+        transition: color 0.2s;
+    }
+    .cancel-link:hover {
+        color: #333;
+    }
+</style>
+{% endblock %}

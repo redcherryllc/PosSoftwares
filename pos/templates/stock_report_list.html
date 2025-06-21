@@ -1,0 +1,274 @@
+{% extends 'base.html' %}
+
+{% block extra_head %}
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f5f7fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .container {
+            margin-top: 2rem;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+        }
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 1.5rem;
+        }
+        .table-responsive {
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .table th, .table td {
+            vertical-align: middle;
+            text-align: center;
+        }
+        .table thead th {
+            background-color: #343a40;
+            color: #fff;
+            border: none;
+        }
+        .table tbody tr:hover {
+            background-color: #f1f3f5;
+            transition: background-color 0.3s;
+        }
+        .low-stock {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .excess-stock {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .return-stock {
+            color: #ff851b; 
+            font-weight: bold;
+        }
+        .alert {
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+        .dataTables_wrapper .datatables_filter input {
+            border-radius: 20px;
+            padding: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .dt-buttons {
+            margin-bottom: 1rem;
+        }
+        .dt-buttons .btn {
+            border-radius: 20px;
+            padding: 0.5rem 1.5rem;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            margin-right: 0.5rem;
+            border: none;
+        }
+        .dt-buttons .buttons-excel {
+            background-color: #28a745;
+            color: #fff;
+        }
+        .dt-buttons .buttons-excel:hover {
+            background-color: #218838;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        .dt-buttons .buttons-print {
+            background-color: #007bff;
+            color: #fff;
+        }
+        .dt-buttons .buttons-print:hover {
+            background-color: #0056b3;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        .dt-buttons .btn i {
+            margin-right: 0.3rem;
+        }
+    
+        .dataTables_wrapper .sorting::after,
+        .dataTables_wrapper .sorting_asc::after,
+        .dataTables_wrapper .sorting_desc::after,
+        .dataTables_wrapper .sorting::before,
+        .dataTables_wrapper .sorting_asc::before,
+        .dataTables_wrapper .sorting_desc::before {
+            display: none !important;
+        }
+        
+        .dataTables_wrapper .sorting,
+        .dataTables_wrapper .sorting_asc,
+        .dataTables_wrapper .sorting_desc {
+            cursor: default;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2><i class="fas fa-chart-line me-2"></i>Stock Report for All Products</h2>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                <i class="fas fa-{% if message.tags == 'success' %}check-circle{% elif message.tags == 'error' %}exclamation-circle{% else %}info-circle{% endif %} me-2"></i>
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {% if reports %}
+        <div class="table-responsive">
+            <table id="stockTable" class="table table-bordered table-hover">
+                <thead>
+                    <tr>
+                        <th>Product ID</th>
+                        <th>Product Name</th>
+                        <th>Stock</th>
+                        <th>Total Sold Qty</th>
+                        <th>Current Month Sold</th>
+                        <th>Last 6M Sold</th>
+                        <th>Monthly Avg Demand</th>
+                        <th>Stocking (6M)</th>
+                        <th>Excess Stock</th>
+                        <th>Total PO Qty</th>
+                        <th>Current Month PO</th>
+                        <th>Last 6M PO</th>
+                        <th>Return Stock</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for report in reports %}
+                        <tr>
+                            <td><a href="{% url 'stock_report' report.product_id %}" class="text-primary">{{ report.product_id }}</a></td>
+                            <td>{{ report.product_name }}</td>
+                            <td class="{% if report.stock < 10 %}low-stock{% endif %}">{{ report.stock }}</td>
+                            <td>{{ report.total_sold_qty }}</td>
+                            <td>{{ report.cm_sale_qty }}</td>
+                            <td>{{ report.last_6m_sale_qty }}</td>
+                            <td>{{ report.mad_6m|floatformat:2 }}</td>
+                            <td>{{ report.stock_month|floatformat:2 }}</td>
+                            <td class="{% if report.excess_stock_qty > 0 %}excess-stock{% endif %}">{{ report.excess_stock_qty|floatformat:2 }}</td>
+                            <td>{{ report.total_po_qty }}</td>
+                            <td>{{ report.cm_po_qty }}</td>
+                            <td>{{ report.last_6m_po_qty }}</td>
+                            <td class="{% if report.return_stock_qty > 0 %}return-stock{% endif %}">{{ report.return_stock_qty|floatformat:2 }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>No products found.
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.3.6/js/dataTables.buttons.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.html5.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.3.6/js/buttons.print.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            var table = $('#stockTable').DataTable({
+                dom: 'Bfrtip',
+                buttons: [
+                    {
+                        extend: 'excel',
+                        text: '<i class="fas fa-file-excel"></i> Export to Excel',
+                        className: 'btn buttons-excel',
+                        title: 'Stock_Report'
+                    },
+                    {
+                        extend: 'print',
+                        text: '<i class="fas fa-print"></i> Print',
+                        className: 'btn buttons-print',
+                        title: '',
+                        customize: function(win) {
+                           
+                            var allData = table.rows({ search: 'applied' }).data();
+                         
+                            var tableHtml = '<table border="1" style="width:100%; border-collapse: collapse;">' +
+                                '<thead><tr>' +
+                                '<th>Product ID</th>' +
+                                '<th>Product Name</th>' +
+                                '<th>Stock</th>' +
+                                '<th>Total Sold Qty</th>' +
+                                '<th>Current Month Sold</th>' +
+                                '<th>Last 6M Sold</th>' +
+                                '<th>Monthly Avg Demand</th>' +
+                                '<th>Stocking (6M)</th>' +
+                                '<th>Excess Stock</th>' +
+                                '<th>Total PO Qty</th>' +
+                                '<th>Current Month PO</th>' +
+                                '<th>Last 6M PO</th>' +
+                                '<th>Return Stock</th>' +
+                                '</tr></thead><tbody>';
+                            
+                            for (var i = 0; i < allData.length; i++) {
+                                tableHtml += '<tr>' +
+                                    '<td>' + allData[i][0].replace(/<a[^>]*>(.*?)<\/a>/, '$1') + '</td>' + 
+                                    '<td>' + allData[i][1] + '</td>' +
+                                    '<td>' + allData[i][2].replace(/class="[^"]*"/, '') + '</td>' + 
+                                    '<td>' + allData[i][3] + '</td>' +
+                                    '<td>' + allData[i][4] + '</td>' +
+                                    '<td>' + allData[i][5] + '</td>' +
+                                    '<td>' + allData[i][6] + '</td>' +
+                                    '<td>' + allData[i][7] + '</td>' +
+                                    '<td>' + allData[i][8].replace(/class="[^"]*"/, '') + '</td>' +
+                                    '<td>' + allData[i][9] + '</td>' +
+                                    '<td>' + allData[i][10] + '</td>' +
+                                    '<td>' + allData[i][11] + '</td>' +
+                                    '<td>' + allData[i][12].replace(/class="[^"]*"/, '') + '</td>' + 
+                                    '</tr>';
+                            }
+                            tableHtml += '</tbody></table>';
+                          
+                            $(win.document.body).html(tableHtml);
+                           
+                            $(win.document.body).css({
+                                'font-family': 'Segoe UI, Tahoma, Geneva, Verdana, sans-serif',
+                                'padding': '20px',
+                                'margin': '0 auto',
+                                'width': '100%'
+                            });
+                            $(win.document.body).find('table').css({
+                                'border': '1px solid #000',
+                                'width': '100%',
+                                'border-collapse': 'collapse'
+                            });
+                            $(win.document.body).find('th, td').css({
+                                'border': '1px solid #000',
+                                'padding': '8px',
+                                'text-align': 'center'
+                            });
+                            $(win.document.body).find('th').css({
+                                'background-color': '#343a40',
+                                'color': '#fff'
+                            });
+                        }
+                    }
+                ],
+                pageLength: 10,
+                responsive: true,
+                order: [[0, 'asc']],
+                language: {
+                    search: "Filter records:",
+                    searchPlaceholder: "Search..."
+                }
+            });
+        });
+    </script>
+{% endblock %}

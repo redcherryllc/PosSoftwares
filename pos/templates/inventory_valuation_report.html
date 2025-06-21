@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block content %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Valuation Report</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <h2>Inventory Valuation Report</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>SKU</th>
+                <th>Product Name</th>
+                <th>Total Quantity</th>
+                <th>Unit Cost</th>
+                <th>Inventory Value</th>
+                <th>Line Total Value</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in inventory_data %}
+            <tr>
+                <td>{{ item.product__sku }}</td>
+                <td>{{ item.product__product_name }}</td>
+                <td>{{ item.total_qty }}</td>
+                <td>{{ item.product__unit_cost }}</td>
+                <td>{{ item.inventory_value }}</td>
+                <td>{{ item.line_total_value|default:"0" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6">No inventory data available.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+{% endblock content %}

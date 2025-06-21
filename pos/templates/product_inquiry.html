@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block title %}Product Inquiry{% endblock %}
+{% block content %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Inquiry</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-6">
+        <header class="flex justify-between items-center mb-6">
+            <h1 class="text-2xl font-bold">Product Inquiry</h1>
+        </header>
+
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold">Products</h2>
+                <a href="{% url 'product_add' %}" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center">
+                    <i class="fas fa-plus mr-2"></i> Add New Product
+                </a>
+            </div>
+
+            {% if messages %}
+                <div class="mb-4">
+                    {% for message in messages %}
+                        <div class="p-4 rounded-md
+                            {% if message.tags == 'error' %}bg-red-100 text-red-700{% endif %}
+                            {% if message.tags == 'success' %}bg-green-100 text-green-700{% endif %}
+                            {% if message.tags == 'warning' %}bg-orange-100 text-orange-700{% endif %}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            {% if products %}
+                <div class="overflow-x-auto">
+                    <table class="w-full border-collapse">
+                        <thead>
+                            <tr class="bg-gray-200">
+                                <th class="border p-2 text-left">Name</th>
+                                <th class="border p-2 text-right">Price</th>
+                                <th class="border p-2 text-right">Stock</th>
+                                <th class="border p-2 text-left">Remarks</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for product in products %}
+                                <tr class="hover:bg-gray-50">
+                                    <td class="border p-2">{{ product.product_name }}</td>
+                                    <td class="border p-2 text-right">{{ product.product_price|floatformat:2 }}</td>
+                                    <td class="border p-2 text-right">{{ product.stock }}</td>
+                                    <td class="border p-2">{{ product.create_remarks|default:"-" }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="text-center p-4 text-gray-600">
+                    No products found.
+                </div>
+            {% endif %}
+        </div>
+
+        <div class="text-sm text-gray-600 flex items-center">
+            <i class="fas fa-lock mr-2"></i> Secure Data Access
+        </div>
+    </div>
+</body>
+{% endblock content %}

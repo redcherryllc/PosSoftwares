@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unpaid Orders</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h2>Unpaid Orders</h2>
+        <!-- Debug: Log unpaid_sales context -->
+        {% comment %}
+            unpaid_sales: {% for sale in unpaid_sales %}
+                Sale No: {{ sale.sale_no }}, Total: {{ sale.total_amount|floatformat:3 }}, Paid: {{ sale.paid_amount|floatformat:3|default:"0.000" }}, Balance: {{ sale.balance|floatformat:3|default:sale.total_amount|floatformat:3 }}, Status: {{ sale.payment_status }}
+            {% endfor %}
+        {% endcomment %}
+        {% if messages %}
+            <div class="alert alert-info">
+                {% for message in messages %}
+                    {{ message }}
+                {% endfor %}
+            </div>
+        {% endif %}
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Sale No</th>
+                    <th>Date</th>
+                    <th>Customer</th>
+                    <th>Table</th>
+                    <th>Room</th>
+                    <th>Vehicle</th>
+                    <th>Total Items</th>
+                    <th>Bill Amount</th>
+                    <th>Paid</th>
+                    <th>Balance</th>
+                    <th>Payment Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sale in unpaid_sales %}
+                <tr>
+                    <td><a href="{% url 'sale_detail' sale.sale_id %}">{{ sale.get_sale_no }}</a></td>
+                    <td>{{ sale.sale_date|date:"F d, Y" }}</td>
+                    <td>{{ sale.customer.customer_name|default:"N/A" }}</td>
+                    <td>{{ sale.table.table_name|default:"N/A" }}</td>
+                    <td>{{ sale.room.room_name|default:"N/A" }}</td>
+                    <td>{{ sale.vehicle.vehicle_no|default:"N/A" }}</td>
+                    <td>{{ sale.total_items }}</td>
+                    <td>{{ sale.total_amount|floatformat:3 }}</td>
+                    <td>{{ sale.paid_amount|floatformat:3|default:"0.000" }}</td>
+                    <td>{{ sale.balance|floatformat:3|default:sale.total_amount|floatformat:3 }}</td>
+                    <td>{{ sale.payment_status }}</td>
+                    
+                    <td>
+                        <a href="{% url 'process_payment' %}?sale_id={{ sale.sale_id }}" class="btn btn-sm btn-primary">Process Payment</a>
+                        <button class="btn btn-sm btn-secondary" onclick="printOrder('{{ sale.sale_id }}')">🖨 Print</button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="12">No unpaid orders found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="d-flex gap-2">
+            <a href="{% url 'home' %}" class="btn btn-secondary">⬅ Back to POS</a>
+            <a href="{% url 'sale_inquiry' %}" class="btn btn-secondary">➡ Sale Inquiry</a>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function printOrder(saleId) {
+            fetch(`/api/get-sale-details/?sale_id=${saleId}`, {
+                method: 'GET',
+                headers: {
+                    'X-CSRFToken': '{{ csrf_token }}'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const sale = data.sale;
+                    const items = data.items;
+                    const currentTime = new Date(); 
+    
+                    const printWindow = window.open('', '_blank', 'width=300,height=400');
+                    printWindow.document.write(`
+                        <html>
+                        <head>
+                            <title>Receipt - ${sale.sale_no}</title>
+                            <style>
+                                body { 
+                                    font-family: 'Courier New', monospace;
+                                    width: 280px;
+                                    padding: 10px;
+                                    line-height: 1.2;
+                                    font-size: 12px;
+                                }
+                                h2 { 
+                                    text-align: center;
+                                    font-size: 14px;
+                                    margin: 0;
+                                }
+                                .header, .footer { 
+                                    text-align: center;
+                                    margin-bottom: 5px;
+                                }
+                                .item { 
+                                    display: flex;
+                                    justify-content: space-between;
+                                    margin-bottom: 2px;
+                                }
+                                .item-name { 
+                                    flex: 1;
+                                    text-align: left;
+                                    overflow: hidden;
+                                    white-space: nowrap;
+                                }
+                                .item-qty, .item-amount { 
+                                    width: 40px;
+                                    text-align: right;
+                                }
+                                .total { 
+                                    display: flex;
+                                    justify-content: space-between;
+                                    font-weight: bold;
+                                    margin-top: 5px;
+                                }
+                                .paid-amount { 
+                                    display: flex;
+                                    justify-content: space-between;
+                                    font-weight: bold;
+                                    margin-top: 5px;
+                                    font-size: 14px; /* Larger font for Paid Amount */
+                                }
+                                hr { 
+                                    border: none;
+                                    border-top: 1px dashed #000;
+                                    margin: 5px 0;
+                                }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="header">
+                                <h2>Receipt</h2>
+                                <p>${sale.business_unit_group_name || 'N/A'}</p>
+                                <p>${sale.business_unit_name || 'N/A'}</p>
+                                <p>${sale.branch_name || 'N/A'}</p>
+                                <p>${sale.saas_customer_name || 'N/A'}</p>
+                            </div>
+                            <hr>
+                            <p>Sale No: ${sale.sale_no}</p>
+                            <p>Customer: ${sale.customer_name || 'N/A'}</p>
+                            <p>Total Items: ${sale.total_items}</p>
+                            <p>Date: ${currentTime.toLocaleString()}</p>
+                            <hr>
+                            <div>
+                                ${items.map(item => `
+                                    <div class="item">
+                                        <span class="item-name">${item.product_name}</span>
+                                        <span class="item-qty">x${item.qty}</span>
+                                        <span class="item-amount">${item.total_amount.toFixed(2)}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <hr>
+                            <div class="total">
+                                <span>Subtotal:</span>
+                                <span>${(sale.total_amount - sale.tax_amount + sale.discount_amount).toFixed(2)}</span>
+                            </div>
+                            <div class="total">
+                                <span>Discount:</span>
+                                <span>${sale.discount_amount.toFixed(2)}</span>
+                            </div>
+                            <div class="total">
+                                <span>Tax:</span>
+                                <span>${sale.tax_amount.toFixed(2)}</span>
+                            </div>
+                            <hr>
+                            <div class="total">
+                                <span>Grand Total:</span>
+                                <span>${sale.total_amount.toFixed(2)}</span>
+                            </div>
+                            <div class="paid-amount">
+                                <span>Paid Amount:</span>
+                                <span>${(sale.paid_amount || 0).toFixed(2)}</span>
+                            </div>
+                            <div class="footer">
+                                <p>Thank You!</p>
+                            </div>
+                        </body>
+                        </html>
+                    `);
+                    printWindow.document.close();
+                    printWindow.print();
+                    printWindow.close();
+                } else {
+                    alert('Failed to retrieve sale details.');
+                }
+            })
+            .then(error => {
+                console.error('Error fetching sale details:', error);
+                alert('A technical error occurred while printing.');
+            });
+        }
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
