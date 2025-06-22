@@ -177,54 +177,7 @@ def login_view(request):
 
     return render(request, 'login.html')
 
-# @login_required
-# def home_view(request):
-#     saas_user_id = request.session.get('saas_user_id')
-#     saas_customer_id = request.session.get('saas_customer_id')
-#     business_unit_group_id = request.session.get('business_unit_group_id')
-#     business_unit_id = request.session.get('business_unit_id')
-#     branch_id = request.session.get('branch_id')
 
-#     try:
-#         user = SAASUsers.objects.get(saas_user_id=saas_user_id)
-#         saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
-#         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
-#         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
-#         branch = Branch.objects.get(branch_id=branch_id)
-
-#         product_groups = ProductGroup.objects.filter(business_unit=business_unit)
-#         products = Products.objects.filter(business_unit=business_unit)
-#         tables = Tables.objects.filter(business_unit=business_unit)
-#         rooms = Rooms.objects.filter(business_unit=business_unit)
-#         vehicles = Vehicle.objects.filter(business_unit=business_unit)
-#         customers = Customer.objects.filter(business_unit=business_unit)
-#         customer_form = CustomerForm()
-#         next_sale_number = SalesHeader.objects.filter(business_unit_id=business_unit_id).count() + 1
-#         next_sale_no = f"SALE-{next_sale_number}"
-
-#         context = {
-#             'username': user.saas_username,
-#             'saas_customer': saas_customer,
-#             'business_unit_group': business_unit_group,
-#             'business_unit': business_unit,
-#             'branch': branch,
-#             'product_groups': product_groups,
-#             'products': products,
-#             'tables': tables,
-#             'rooms': rooms,
-#             'vehicles': vehicles,
-#             'customers': customers,
-#             'customer_form': customer_form,
-#             'next_sale_no': next_sale_no,
-#         }
-#         return render(request, 'home.html', context)
-#     except Exception as e:
-#         logger.error(f"Error in home_view: {str(e)}")
-#         messages.error(request, f"Error: {str(e)}")
-#         return redirect('login')
-
-from django.utils import timezone
-from django.contrib.auth.decorators import login_required
 
 @login_required
 def home_view(request):
@@ -248,17 +201,15 @@ def home_view(request):
         vehicles = Vehicle.objects.filter(business_unit=business_unit)
         customers = Customer.objects.filter(business_unit=business_unit)
         customer_form = CustomerForm()
-        
-        # Get today's date
+  
         today = timezone.now().date()
         
-        # Count today's sales for this business unit
+      
         today_sales_count = SalesHeader.objects.filter(
             business_unit_id=business_unit_id,
             sale_date=today
         ).count()
         
-        # Generate next sale number with date prefix
         date_str = today.strftime('%Y%m%d')
         next_seq_num = str(today_sales_count + 1).zfill(3)
         next_sale_no = f"{date_str}{next_seq_num}"
