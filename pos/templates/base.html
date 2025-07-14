@@ -1,5 +1,3 @@
-
-
 {% load static %}
 <!DOCTYPE html>
 <html lang="en">
@@ -7,8 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Admin Dashboard{% endblock %}</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -21,8 +18,8 @@
             display: flex;
             height: 100vh;
             background-color: #f5f7fa;
+            overflow: hidden;
         }
-        
         
         .sidebar {
             width: 240px;
@@ -57,13 +54,13 @@
             border: none;
             color: #a0a9b8;
             cursor: pointer;
-            font-size: 16px;
+            font-size: 18px;
             padding: 0;
             display: flex;
             align-items: center;
             justify-content: center;
-            width: 28px;
-            height: 28px;
+            width: 32px;
+            height: 32px;
             border-radius: 4px;
         }
         
@@ -74,6 +71,8 @@
         
         .sidebar-menu {
             padding: 16px 0;
+            flex-grow: 1;
+            overflow-y: auto;
         }
         
         .menu-item {
@@ -85,6 +84,7 @@
             white-space: nowrap;
             text-decoration: none;
             transition: all 0.2s ease;
+            font-size: 14px;
         }
         
         .menu-item:hover {
@@ -113,8 +113,8 @@
         
         .sidebar.collapsed .menu-item i {
             margin-right: 0;
+            font-size: 18px;
         }
-        
         
         .main-content {
             flex: 1;
@@ -125,25 +125,31 @@
         
         .top-bar {
             display: flex;
+            flex-direction: row; /* Default row layout for larger screens */
             justify-content: space-between;
             align-items: center;
-            padding: 16px 24px;
+            padding: 12px 16px;
             border-bottom: 1px solid #e0e6ed;
             background-color: white;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+            flex-wrap: wrap;
+            gap: 8px; /* Space between items if wrapped */
         }
         
         .page-title {
-            font-size: 20px;
+            font-size: clamp(16px, 4vw, 18px);
             font-weight: 600;
             color: #2c3e50;
+            flex: 0 0 auto; /* Prevent stretching */
         }
         
         .user-info {
             display: flex;
             align-items: center;
-            font-size: 14px;
+            font-size: clamp(12px, 3vw, 13px);
             color: #4d5b75;
+            flex-wrap: wrap;
+            gap: 8px;
         }
         
         .user-info span {
@@ -162,14 +168,17 @@
         }
         
         .content {
-            padding: 24px;
+            padding: clamp(12px, 3vw, 16px);
             flex: 1;
         }
         
-        
-        @media (max-width: 992px) {
+        @media (max-width: 991px) {
             .sidebar {
                 width: 60px;
+            }
+            
+            .sidebar.expanded {
+                width: 220px;
             }
             
             .sidebar .menu-item span {
@@ -178,23 +187,16 @@
             
             .sidebar .menu-item {
                 justify-content: center;
-                padding: 12px 0;
+                padding: 10px 0;
             }
             
             .sidebar .menu-item i {
                 margin-right: 0;
+                font-size: 18px;
             }
             
             .sidebar-header h2 {
                 display: none;
-            }
-            
-            .sidebar.collapsed {
-                width: 60px;
-            }
-            
-            .sidebar.expanded {
-                width: 240px;
             }
             
             .sidebar.expanded .menu-item span {
@@ -203,37 +205,121 @@
             
             .sidebar.expanded .menu-item {
                 justify-content: flex-start;
-                padding: 12px 16px;
+                padding: 10px 16px;
             }
             
             .sidebar.expanded .menu-item i {
-                margin-right: 10px;
+                margin-right: 8px;
             }
             
             .sidebar.expanded .sidebar-header h2 {
                 display: block;
             }
+            
+            .top-bar {
+                flex-direction: column; /* Two-row layout */
+                align-items: flex-start;
+                padding: 12px 16px;
+                gap: 10px; /* Space between page-title and user-info */
+            }
+            
+            .page-title {
+                width: 100%; /* Full width for first row */
+                font-size: clamp(16px, 4vw, 18px);
+            }
+            
+            .user-info {
+                width: 100%; /* Full width for second row */
+                flex-direction: row; /* Keep user-info items in a row */
+                flex-wrap: wrap;
+                gap: 8px;
+                font-size: clamp(12px, 3vw, 13px);
+            }
+            
+            .content {
+                padding: 12px;
+            }
         }
         
-        @media (max-width: 576px) {
+        @media (max-width: 767px) {
             .top-bar {
-                flex-direction: column;
-                align-items: flex-start;
+                padding: 10px 12px;
                 gap: 8px;
             }
             
             .user-info {
-                flex-wrap: wrap;
+                flex-direction: row; /* Maintain row layout */
+                gap: 6px;
+            }
+            
+            .user-info span,
+            .user-info a {
+                font-size: 12px;
             }
             
             .content {
-                padding: 16px;
+                padding: 10px;
+            }
+            
+            .menu-item {
+                font-size: 13px;
+            }
+            
+            .toggle-button {
+                width: 28px;
+                height: 28px;
+                font-size: 16px;
             }
         }
         
-
-        {% block extra_styles %}{% endblock %}
+        @media (max-width: 399px) {
+            .sidebar {
+                width: 50px;
+            }
+            
+            .sidebar.collapsed {
+                width: 50px;
+            }
+            
+            .sidebar.expanded {
+                width: 200px;
+            }
+            
+            .top-bar {
+                padding: 8px 10px;
+                gap: 6px;
+            }
+            
+            .page-title {
+                font-size: 14px;
+            }
+            
+            .user-info {
+                font-size: 11px;
+                gap: 4px;
+            }
+            
+            .content {
+                padding: 8px;
+            }
+            
+            .menu-item {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+            
+            .menu-item i {
+                font-size: 14px;
+            }
+            
+            .toggle-button {
+                width: 24px;
+                height: 24px;
+                font-size: 14px;
+            }
+        }
     </style>
+    {% block extra_styles %}{% endblock %}
     {% block extra_head %}{% endblock %}
 </head>
 <body>
@@ -244,118 +330,88 @@
                 <i class="fas fa-bars"></i>
             </button>
         </div>
-
-
         <div class="sidebar-menu">
-    <a href="{% url 'home' %}" class="menu-item {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
-        <i class="fas fa-home"></i>
-        <span>Home</span>
-    </a>
-    <a href="{% url 'admin_view' %}" class="menu-item {% if request.resolver_match.url_name == 'admin_view' %}active{% endif %}">
-        <i class="fas fa-user-shield"></i>
-        <span>Admin</span>
-    </a>
-    <a href="{% url 'expense_entry' %}" class="menu-item {% if request.resolver_match.url_name == 'expense_entry' %}active{% endif %}">
-        <i class="fas fa-book-open"></i>
-        <span>Ledger</span>
-    </a>
-    <a href="{% url 'general_ledger_report' %}" class="menu-item {% if request.resolver_match.url_name == 'general_ledger_report' %}active{% endif %}">
-        <i class="fas fa-file-invoice"></i>
-        <span>General Ledger</span>
-    </a>
-    <a href="{% url 'trial_balance_report' %}" class="menu-item {% if request.resolver_match.url_name == 'trial_balance_report' %}active{% endif %}">
-        <i class="fas fa-balance-scale-right"></i>
-        <span>Trial Balance</span>
-    </a>
-    <a href="{% url 'balance_sheet' %}" class="menu-item {% if request.resolver_match.url_name == 'balance_sheet' %}active{% endif %}">
-        <i class="fas fa-file-contract"></i>
-        <span>Balance Sheet</span>
-    </a>
-    <a href="{% url 'income_statement' %}" class="menu-item {% if request.resolver_match.url_name == 'income_statement' %}active{% endif %}">
-        <i class="fas fa-chart-bar"></i>
-        <span>Income Statement</span>
-    </a>
-    <a href="{% url 'sales_by_customer_report' %}" class="menu-item {% if request.resolver_match.url_name == 'sales_by_customer_report' %}active{% endif %}">
-    <i class="fas fa-chart-line"></i>
-    <span>Sales by Customer</span>
-</a>
-    <a href="{% url 'product_sales_report' %}" class="menu-item {% if request.resolver_match.url_name == 'product_sales_report' %}active{% endif %}">
-        <i class="fas fa-shopping-cart"></i>
-        <span>Product Sales</span>
-    </a>
-
-    <a href="{% url 'inventory_valuation_report' %}" class="menu-item {% if request.resolver_match.url_name == 'inventory_valuation_report' %}active{% endif %}">
-        <i class="fas fa-boxes"></i>
-        <span>Inventory Valuation</span>
-    </a>
-
-    
-    <a href="{% url 'sale_inquiry' %}" class="menu-item {% if request.resolver_match.url_name == 'sale_inquiry' %}active{% endif %}">
-        <i class="fas fa-search-dollar"></i>
-        <span>Sale Inquiry</span>
-    </a>
-
-    
-    <a href="{% url 'purchase_by_supplier_report' %}" class="menu-item {% if request.resolver_match.url_name == 'purchase_by_supplier_report' %}active{% endif %}">
-        <i class="fas fa-truck-loading"></i>
-        <span>Purchase by Supplier</span>
-    </a>
-    
-    <a href="{% url 'po_creation' %}" class="menu-item {% if request.resolver_match.url_name == 'po_creation' %}active{% endif %}">
-        <i class="fas fa-file-signature"></i>
-        <span>Create PO</span>
-    </a>
-    <a href="{% url 'po_inquiry' %}" class="menu-item {% if request.resolver_match.url_name == 'po_inquiry' %}active{% endif %}">
-        <i class="fas fa-search"></i>
-        <span>PO Inquiry</span>
-    </a>
-    {% comment %} <a href="{% url 'supplier_payment' %}" class="menu-item {% if request.resolver_match.url_name == 'supplier_payment' %}active{% endif %}">
-        <i class="fas fa-money-check-alt"></i>
-        <span>Supplier Payment</span>
-    </a> {% endcomment %}
-
-    {% comment %} 
-    <a href="{% url 'supplier_payment_status' %}" class="menu-item {% if request.resolver_match.url_name == 'supplier_payment_status' %}active{% endif %}">
-        <i class="fas fa-money-check-alt"></i>
-        <span>Supplier Payment Status</span>
-    </a> {% endcomment %}
-    
-    <a href="{% url 'stock_adjustment' %}" class="menu-item {% if request.resolver_match.url_name == 'stock_adjustment' %}active{% endif %}">
-        <i class="fas fa-tools"></i>
-        <span>Stock Adjustment</span>
-    </a>
-
-    <a href="{% url 'stock_return' %}" class="menu-item {% if request.resolver_match.url_name == 'stock_return' %}active{% endif %}">
-        <i class="fas fa-undo"></i>
-        <span>Stock Return</span>
-    </a>
-    
-    <a href="{% url 'stock_report_list' %}" class="menu-item {% if request.resolver_match.url_name == 'stock_report_list' %}active{% endif %}">
-        <i class="fas fa-clipboard-list"></i>
-        <span>Stock Report List</span>
-    </a>
-
-    {% comment %} <a href="{% url 'stock_report' product_id='1001' %}" class="menu-item {% if request.resolver_match.url_name == 'stock_report' %}active{% endif %}">
-        <i class="fas fa-file-alt"></i>
-        <span>Stock Report (Single)</span>
-    </a> {% endcomment %}
-    
-    <a href="{% url 'customer_bills' %}" class="menu-item {% if request.resolver_match.url_name == 'customer_bills' %}active{% endif %}">
-        <i class="fas fa-receipt"></i>
-        <span>Customer Bills</span>
-    </a>
-    
-    <a href="{% url 'customer_summary' %}" class="menu-item {% if request.resolver_match.url_name == 'customer_summary' %}active{% endif %}">
-        <i class="fas fa-users-cog"></i>
-        <span>Customer Summary</span>
-    </a>
-    
-    
-    <a href="{% url 'logout' %}" class="menu-item">
-        <i class="fas fa-sign-out-alt"></i>
-        <span>Logout</span>
-    </a>
-</div>
+            <a href="{% url 'home' %}" class="menu-item {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+                <i class="fas fa-home"></i>
+                <span>Home</span>
+            </a>
+            <a href="{% url 'admin_view' %}" class="menu-item {% if request.resolver_match.url_name == 'admin_view' %}active{% endif %}">
+                <i class="fas fa-user-shield"></i>
+                <span>Admin</span>
+            </a>
+            <a href="{% url 'expense_entry' %}" class="menu-item {% if request.resolver_match.url_name == 'expense_entry' %}active{% endif %}">
+                <i class="fas fa-book-open"></i>
+                <span>Ledger</span>
+            </a>
+            <a href="{% url 'general_ledger_report' %}" class="menu-item {% if request.resolver_match.url_name == 'general_ledger_report' %}active{% endif %}">
+                <i class="fas fa-file-invoice"></i>
+                <span>General Ledger</span>
+            </a>
+            <a href="{% url 'trial_balance_report' %}" class="menu-item {% if request.resolver_match.url_name == 'trial_balance_report' %}active{% endif %}">
+                <i class="fas fa-balance-scale-right"></i>
+                <span>Trial Balance</span>
+            </a>
+            <a href="{% url 'balance_sheet' %}" class="menu-item {% if request.resolver_match.url_name == 'balance_sheet' %}active{% endif %}">
+                <i class="fas fa-file-contract"></i>
+                <span>Balance Sheet</span>
+            </a>
+            <a href="{% url 'income_statement' %}" class="menu-item {% if request.resolver_match.url_name == 'income_statement' %}active{% endif %}">
+                <i class="fas fa-chart-bar"></i>
+                <span>Income Statement</span>
+            </a>
+            <a href="{% url 'sales_by_customer_report' %}" class="menu-item {% if request.resolver_match.url_name == 'sales_by_customer_report' %}active{% endif %}">
+                <i class="fas fa-chart-line"></i>
+                <span>Sales by Customer</span>
+            </a>
+            <a href="{% url 'product_sales_report' %}" class="menu-item {% if request.resolver_match.url_name == 'product_sales_report' %}active{% endif %}">
+                <i class="fas fa-shopping-cart"></i>
+                <span>Product Sales</span>
+            </a>
+            <a href="{% url 'inventory_valuation_report' %}" class="menu-item {% if request.resolver_match.url_name == 'inventory_valuation_report' %}active{% endif %}">
+                <i class="fas fa-boxes"></i>
+                <span>Inventory Valuation</span>
+            </a>
+            <a href="{% url 'sale_inquiry' %}" class="menu-item {% if request.resolver_match.url_name == 'sale_inquiry' %}active{% endif %}">
+                <i class="fas fa-search-dollar"></i>
+                <span>Sale Inquiry</span>
+            </a>
+            <a href="{% url 'purchase_by_supplier_report' %}" class="menu-item {% if request.resolver_match.url_name == 'purchase_by_supplier_report' %}active{% endif %}">
+                <i class="fas fa-truck-loading"></i>
+                <span>Purchase by Supplier</span>
+            </a>
+            <a href="{% url 'po_creation' %}" class="menu-item {% if request.resolver_match.url_name == 'po_creation' %}active{% endif %}">
+                <i class="fas fa-file-signature"></i>
+                <span>Create PO</span>
+            </a>
+            <a href="{% url 'po_inquiry' %}" class="menu-item {% if request.resolver_match.url_name == 'po_inquiry' %}active{% endif %}">
+                <i class="fas fa-search"></i>
+                <span>PO Inquiry</span>
+            </a>
+            <a href="{% url 'stock_adjustment' %}" class="menu-item {% if request.resolver_match.url_name == 'stock_adjustment' %}active{% endif %}">
+                <i class="fas fa-tools"></i>
+                <span>Stock Adjustment</span>
+            </a>
+            <a href="{% url 'stock_return' %}" class="menu-item {% if request.resolver_match.url_name == 'stock_return' %}active{% endif %}">
+                <i class="fas fa-undo"></i>
+                <span>Stock Return</span>
+            </a>
+            <a href="{% url 'stock_report_list' %}" class="menu-item {% if request.resolver_match.url_name == 'stock_report_list' %}active{% endif %}">
+                <i class="fas fa-clipboard-list"></i>
+                <span>Stock Report List</span>
+            </a>
+            <a href="{% url 'customer_bills' %}" class="menu-item {% if request.resolver_match.url_name == 'customer_bills' %}active{% endif %}">
+                <i class="fas fa-receipt"></i>
+                <span>Customer Bills</span>
+            </a>
+            <a href="{% url 'customer_summary' %}" class="menu-item {% if request.resolver_match.url_name == 'customer_summary' %}active{% endif %}">
+                <i class="fas fa-users-cog"></i>
+                <span>Customer Summary</span>
+            </a>
+            <a href="{% url 'logout' %}" class="menu-item">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </a>
+        </div>
     </div>
     
     <div class="main-content">
@@ -371,7 +427,6 @@
         
         <div class="content">
             {% block content %}
-            
             {% endblock %}
         </div>
     </div>
@@ -379,44 +434,65 @@
     <script>
         const sidebar = document.getElementById('sidebar');
         const toggleButton = document.getElementById('toggle-sidebar');
+        const menuItems = document.querySelectorAll('.sidebar-menu .menu-item');
 
-        
-        const savedState = localStorage.getItem('sidebarState');
-        const isMobile = window.innerWidth <= 992;
+        // Initialize sidebar state
+        const isMobile = window.innerWidth <= 991;
 
-        
-        if (isMobile && !savedState) {
-            sidebar.classList.add('collapsed');
-        } else if (savedState === 'expanded') {
-            sidebar.classList.remove('collapsed');
-            sidebar.classList.add('expanded');
-        } else if (savedState === 'collapsed') {
+        if (isMobile) {
+            // Always collapse sidebar on small devices
             sidebar.classList.add('collapsed');
             sidebar.classList.remove('expanded');
+            localStorage.setItem('sidebarState', 'collapsed');
+        } else {
+            // Use saved state for larger devices
+            const savedState = localStorage.getItem('sidebarState');
+            if (savedState === 'expanded') {
+                sidebar.classList.remove('collapsed');
+                sidebar.classList.add('expanded');
+            } else {
+                sidebar.classList.add('collapsed');
+                sidebar.classList.remove('expanded');
+            }
         }
 
+        // Toggle sidebar on button click
         toggleButton.addEventListener('click', () => {
             sidebar.classList.toggle('collapsed');
             sidebar.classList.toggle('expanded');
-
-            if (sidebar.classList.contains('collapsed')) {
-                localStorage.setItem('sidebarState', 'collapsed');
-            } else {
-                localStorage.setItem('sidebarState', 'expanded');
-            }
+            localStorage.setItem('sidebarState', sidebar.classList.contains('collapsed') ? 'collapsed' : 'expanded');
         });
 
-        window.addEventListener('resize', () => {
-            const isNowMobile = window.innerWidth <= 992;
-            const savedState = localStorage.getItem('sidebarState');
+        // Auto-close sidebar on menu item click for small devices
+        menuItems.forEach(item => {
+            item.addEventListener('click', () => {
+                if (window.innerWidth <= 991) {
+                    sidebar.classList.add('collapsed');
+                    sidebar.classList.remove('expanded');
+                    localStorage.setItem('sidebarState', 'collapsed');
+                }
+            });
+        });
 
-            if (isNowMobile && !savedState) {
-                sidebar.classList.add('collapsed');
-                sidebar.classList.remove('expanded');
-            } else if (!isNowMobile && savedState === 'expanded') {
-                sidebar.classList.remove('collapsed');
-                sidebar.classList.add('expanded');
-            }
+        // Handle resize events with debouncing
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                const isNowMobile = window.innerWidth <= 991;
+                const savedState = localStorage.getItem('sidebarState');
+
+                if (isNowMobile) {
+                    // Always collapse on small devices
+                    sidebar.classList.add('collapsed');
+                    sidebar.classList.remove('expanded');
+                    localStorage.setItem('sidebarState', 'collapsed');
+                } else if (savedState === 'expanded') {
+                    // Restore expanded state on larger devices
+                    sidebar.classList.remove('collapsed');
+                    sidebar.classList.add('expanded');
+                }
+            }, 100);
         });
     </script>
     {% block extra_scripts %}{% endblock %}
