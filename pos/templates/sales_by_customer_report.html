@@ -3,60 +3,44 @@
 {% load static %}
 
 {% block content %}
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sales by Customer Report</title>
+    <link rel="stylesheet" href="{% static 'images/css/sales_by_customer_report.css' %}">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <style>
-        @media print {
-            body * {
-                visibility: hidden;
-            }
-            .table-container, .table-container * {
-                visibility: visible;
-            }
-            .table-container {
-                position: absolute;
-                left: 0;
-                top: 0;
-            }
-            .no-print {
-                display: none;
-            }
-        }
-    </style>
+    
 </head>
-<body class="bg-gray-100">
-    <div class="container mx-auto p-6">
-        <header class="flex justify-between items-center mb-6 no-print">
-            <h1 class="text-2xl font-bold">Sales by Customer Report</h1>
-            <div class="flex gap-2">
-                <button onclick="printTables()" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto p-3 sm:p-6 max-w-7xl">
+        <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 sm:mb-6 no-print gap-2 sm:gap-0">
+            <h1 class="text-xl sm:text-2xl font-bold">Sales by Customer Report</h1>
+            <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <button onclick="printTables()" class="bg-gray-600 text-white px-3 sm:px-4 py-2 rounded-md hover:bg-gray-700 transition-colors text-sm">
                     Print Report
                 </button>
-                <button onclick="exportToExcel()" class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
+                <button onclick="exportToExcel()" class="bg-green-600 text-white px-3 sm:px-4 py-2 rounded-md hover:bg-green-700 transition-colors text-sm">
                     Export to Excel
                 </button>
             </div>
         </header>
 
-        <div class="bg-white p-6 rounded-lg shadow-md mb-6 no-print">
-            <form method="GET" class="flex space-x-4">
-                <div>
-                    <label for="start_date" class="block text-sm font-medium">Start Date</label>
+        <div class="bg-white p-3 sm:p-6 rounded-lg shadow-md mb-4 sm:mb-6 no-print">
+            <form method="GET" class="flex flex-col sm:flex-row gap-3 sm:gap-4">
+                <div class="flex-1 min-w-0">
+                    <label for="start_date" class="block text-sm font-medium mb-1">Start Date</label>
                     <input type="date" id="start_date" name="start_date" value="{{ start_date|date:'Y-m-d' }}"
-                           class="mt-1 p-2 border rounded-md">
+                           class="w-full p-2 border rounded-md text-sm">
                 </div>
-                <div>
-                    <label for="end_date" class="block text-sm font-medium">End Date</label>
+                <div class="flex-1 min-w-0">
+                    <label for="end_date" class="block text-sm font-medium mb-1">End Date</label>
                     <input type="date" id="end_date" name="end_date" value="{{ end_date|date:'Y-m-d' }}"
-                           class="mt-1 p-2 border rounded-md">
+                           class="w-full p-2 border rounded-md text-sm">
                 </div>
                 <div class="flex items-end">
-                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                    <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm">
                         Filter
                     </button>
                 </div>
@@ -64,44 +48,56 @@
         </div>
 
         {% if messages %}
-            <div class="mb-6 no-print">
+            <div class="mb-4 sm:mb-6 no-print">
                 {% for message in messages %}
-                    <div class="bg-red-100 text-red-700 p-4 rounded-md">{{ message }}</div>
+                    <div class="bg-red-100 text-red-700 p-3 sm:p-4 rounded-md text-sm">{{ message }}</div>
                 {% endfor %}
             </div>
         {% endif %}
 
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <div id="table-container" class="table-container">
+        <div class="bg-white p-3 sm:p-6 rounded-lg shadow-md">
+            <div id="sales-report-tables">
+                <h2 class="text-lg sm:text-xl font-semibold mb-4">{{ business_unit.business_unit_name|default:"Business Unit" }}</h2>
+                {% if start_date or end_date %}
+                    <p class="mb-4 text-sm sm:text-base">
+                        {% if start_date and end_date %}
+                            Period: {{ start_date|date:"F d, Y" }} to {{ end_date|date:"F d, Y" }}
+                        {% elif start_date %}
+                            Period: From {{ start_date|date:"F d, Y" }}
+                        {% elif end_date %}
+                            Period: Up to {{ end_date|date:"F d, Y" }}
+                        {% endif %}
+                    </p>
+                {% endif %}
                 
-                <h2 class="text-xl font-semibold mb-4">{{ business_unit.business_unit_name }}</h2>
-                <p class="mb-4">Period: {{ start_date|date:'Y-m-d' }} to {{ end_date|date:'Y-m-d' }}</p>
-                
-            
-                <table id="sales-table" class="w-full border-collapse">
-                    <thead>
-                        <tr class="bg-gray-200">
-                            <th class="border p-2 text-left">Customer Name</th>
-                            <th class="border p-2 text-right">Number of Orders</th>
-                            <th class="border p-2 text-right">Total Sales</th>
-                            <th class="border p-2 text-right">Outstanding Balance</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for sale in sales %}
-                            <tr>
-                                <td class="border p-2">{{ sale.customer_name }}</td>
-                                <td class="border p-2 text-right">{{ sale.number_of_orders|default:"0" }}</td>
-                                <td class="border p-2 text-right">{{ sale.total_sales|floatformat:2|default:"0.00" }}</td>
-                                <td class="border p-2 text-right">{{ sale.outstanding_balance|floatformat:2|default:"0.00" }}</td>
+                <div class="overflow-x-auto">
+                    <table id="sales-table" class="w-full border-collapse responsive-table min-w-full">
+                        <thead>
+                            <tr class="bg-gray-200">
+                                <th class="border p-2 text-left text-xs sm:text-sm">Customer Name</th>
+                                <th class="border p-2 text-right text-xs sm:text-sm">Number of Orders</th>
+                                <th class="border p-2 text-right text-xs sm:text-sm">Total Sales</th>
+                                <th class="border p-2 text-right text-xs sm:text-sm">Outstanding Balance</th>
                             </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="4" class="border p-2 text-center">No sales data found.</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {% for sale in sales %}
+                                <tr>
+                                    <td class="border p-2 account-name text-xs sm:text-sm" title="{{ sale.customer_name }}">{{ sale.customer_name }}</td>
+                                    <td class="border p-2 text-right balance-cell text-xs sm:text-sm" data-value="{{ sale.number_of_orders|default:'0' }}">{{ sale.number_of_orders|default:"0" }}</td>
+                                    <td class="border p-2 text-right balance-cell text-xs sm:text-sm {% if sale.total_sales < 0 %}text-red-600{% endif %}" 
+                                        data-value="{{ sale.total_sales|default:'0.00' }}">{{ sale.total_sales|floatformat:2|default:"0.00" }}</td>
+                                    <td class="border p-2 text-right balance-cell text-xs sm:text-sm {% if sale.outstanding_balance < 0 %}text-red-600{% endif %}" 
+                                        data-value="{{ sale.outstanding_balance|default:'0.00' }}">{{ sale.outstanding_balance|floatformat:2|default:"0.00" }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="4" class="border p-2 text-center text-xs sm:text-sm">No sales data found.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -112,61 +108,47 @@
         }
 
         function exportToExcel() {
-            
             const wb = XLSX.utils.book_new();
+            const companyName = document.querySelector('h2').textContent.trim();
+            const combinedData = [
+                [companyName],
+                ["Sales by Customer Report"],
+                {% if start_date or end_date %}
+                    ["Period: {% if start_date and end_date %}{{ start_date|date:'F d, Y' }} to {{ end_date|date:'F d, Y' }}{% elif start_date %}From {{ start_date|date:'F d, Y' }}{% else %}Up to {{ end_date|date:'F d, Y' }}{% endif %}"],
+                {% endif %}
+                [""]
+            ];
             
+            const salesHeaders = [];
+            document.querySelectorAll('#sales-table thead th').forEach(th => salesHeaders.push(th.textContent.trim()));
+            combinedData.push(salesHeaders);
             
-            const tableContainer = document.getElementById('table-container');
-            const container = tableContainer.cloneNode(true);
-            
-    
-            const fullTable = document.createElement('table');
-            const tbody = document.createElement('tbody');
-            
-            
-            const businessUnitRow = document.createElement('tr');
-            const businessUnitCell = document.createElement('td');
-            businessUnitCell.colSpan = 4;
-            businessUnitCell.textContent = "{{ business_unit.business_unit_name }}";
-            businessUnitCell.style.fontWeight = 'bold';
-            businessUnitCell.style.fontSize = '16px';
-            businessUnitRow.appendChild(businessUnitCell);
-            tbody.appendChild(businessUnitRow);
-            
-            
-            const dateRow = document.createElement('tr');
-            const dateCell = document.createElement('td');
-            dateCell.colSpan = 4;
-            dateCell.textContent = "Period: {{ start_date|date:'Y-m-d' }} to {{ end_date|date:'Y-m-d' }}";
-            dateRow.appendChild(dateCell);
-            tbody.appendChild(dateRow);
-            
-        
-            tbody.appendChild(document.createElement('tr'));
-            
-            
-            const salesTable = container.querySelector('#sales-table');
-            
-            
-            const headerRow = salesTable.querySelector('thead tr').cloneNode(true);
-            tbody.appendChild(headerRow);
-            
-            
-            const dataRows = Array.from(salesTable.querySelectorAll('tbody tr'));
-            dataRows.forEach(row => {
-                tbody.appendChild(row.cloneNode(true));
+            const salesRows = document.querySelectorAll('#sales-table tbody tr');
+            salesRows.forEach(row => {
+                if (row.cells.length > 1) {
+                    const rowData = [];
+                    rowData.push(row.cells[0].textContent.trim());
+                    for (let i = 1; i < row.cells.length; i++) {
+                        const cell = row.cells[i];
+                        if (cell.hasAttribute('data-value')) {
+                            rowData.push(parseFloat(cell.getAttribute('data-value')));
+                        } else {
+                            rowData.push(cell.textContent.trim());
+                        }
+                    }
+                    combinedData.push(rowData);
+                }
             });
             
+            const ws = XLSX.utils.aoa_to_sheet(combinedData);
+            ws['!cols'] = [
+                {wch: 40},
+                {wch: 15},
+                {wch: 15},
+                {wch: 15}
+            ];
             
-            fullTable.appendChild(tbody);
-            
-            
-            const ws = XLSX.utils.table_to_sheet(fullTable);
-            
-        
             XLSX.utils.book_append_sheet(wb, ws, "Sales by Customer");
-            
-            
             const startDate = "{{ start_date|date:'Y-m-d' }}".replace(/-/g, '');
             const endDate = "{{ end_date|date:'Y-m-d' }}".replace(/-/g, '');
             XLSX.writeFile(wb, `sales_by_customer_${startDate}_${endDate}.xlsx`);
@@ -174,3 +156,4 @@
     </script>
 </body>
 {% endblock content %}
+

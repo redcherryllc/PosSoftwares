@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Delete Room{% endblock %}
+{% block content %}
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="{% static 'images/css/room_confirm_delete.css' %}">
+   
+</head>
+
+<div class="container">
+    <h2><i class="fas fa-trash-alt"></i> Confirm Delete</h2>
+    <p>Are you sure you want to delete "{{ object.room_name }}"?</p>
+    <form method="post" class="btn-container">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">
+            <i class="fas fa-trash"></i> Delete
+        </button>
+        <a href="{% url 'room_list' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Cancel
+        </a>
+    </form>
+    <div class="secure-badge">
+        <i class="fas fa-lock"></i> Secure Action | All actions are encrypted and logged
+    </div>
+</div>
+{% endblock %}

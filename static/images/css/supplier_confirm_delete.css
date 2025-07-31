@@ -1,0 +1,117 @@
+.container {
+        max-width: 90vw;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        border-bottom: 2px solid #eaeaea;
+        padding-bottom: 10px;
+    }
+    .page-title {
+        font-size: clamp(20px, 6vw, 24px);
+        color: #333;
+        margin: 0;
+    }
+    .messages {
+        margin-bottom: 20px;
+    }
+    .messages p {
+        padding: 10px 12px;
+        border-radius: 6px;
+        margin: 8px 0;
+        font-size: clamp(14px, 4vw, 15px);
+    }
+    .messages .error {
+        background-color: #ffebee;
+        color: #c62828;
+        border-left: 4px solid #c62828;
+    }
+    .messages .success {
+        background-color: #e8f5e9;
+        color: #2e7d32;
+        border-left: 4px solid #2e7d32;
+    }
+    .card {
+        background: #ffffff;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        margin-bottom: 20px;
+    }
+    .card-header h2 {
+        font-size: clamp(18px, 5vw, 20px);
+    }
+    .card p {
+        font-size: clamp(14px, 4vw, 16px);
+        margin: 15px 0;
+    }
+    .btn-container {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 20px;
+    }
+    .btn-danger {
+        padding: 10px 20px;
+        color: white;
+        background-color: #c62828;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: clamp(14px, 4vw, 15px);
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        transition: background-color 0.2s;
+        width: 100%;
+    }
+    .btn-danger:hover {
+        background-color: #b71c1c;
+    }
+    .cancel-link {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        color: #666;
+        text-decoration: none;
+        font-weight: 500;
+        font-size: clamp(14px, 4vw, 15px);
+        transition: color 0.2s;
+        width: 100%;
+        padding: 10px;
+        text-align: center;
+    }
+    .cancel-link:hover {
+        color: #333;
+    }
+    @media (min-width: 768px) {
+        .container {
+            max-width: 800px;
+            padding: 30px;
+        }
+        .page-title {
+            font-size: 28px;
+        }
+        .card-header h2 {
+            font-size: 24px;
+        }
+        .card p {
+            font-size: 16px;
+        }
+        .btn-container {
+            flex-direction: row;
+            justify-content: space-between;
+            gap: 20px;
+        }
+        .btn-danger, .cancel-link {
+            width: auto;
+        }
+    }

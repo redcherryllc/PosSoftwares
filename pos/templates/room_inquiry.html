@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1 class="page-title">Room Inquiry</h1>
+    </div>
+
+    {% if messages %}
+        <div class="messages">
+            {% for message in messages %}
+                <p class="{% if message.tags %}{{ message.tags }}{% endif %}">
+                    {% if message.tags == 'error' %}
+                        <i class="fas fa-exclamation-circle"></i>
+                    {% elif message.tags == 'success' %}
+                        <i class="fas fa-check-circle"></i>
+                    {% endif %}
+                    {{ message }}
+                </p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-door-open"></i> Rooms</h2>
+        </div>
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Room Name</th>
+                        <th>Room Type</th>
+                        <th>Location</th>
+                        <th>Phone 1</th>
+                        <th>Phone 2</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for room in rooms %}
+                        <tr>
+                            <td>{{ room.room_name }}</td>
+                            <td>{{ room.room_type }}</td>
+                            <td>{{ room.location }}</td>
+                            <td>{{ room.phone_1 }}</td>
+                            <td>{{ room.phone_2 }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5">No rooms found.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<link rel="stylesheet" href="{% static 'images/css/room_inquiry.css' %}">
+
+
+{% endblock %}

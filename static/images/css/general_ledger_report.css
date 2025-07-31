@@ -1,0 +1,54 @@
+@media print {
+            body * {
+                visibility: hidden;
+            }
+            #ledger-table, #ledger-table * {
+                visibility: visible;
+            }
+            #ledger-table {
+                position: absolute;
+                left: 0;
+                top: 0;
+            }
+            .no-print {
+                display: none;
+            }
+        }
+        
+      
+        @media (max-width: 640px) {
+            .responsive-table {
+                font-size: 0.875rem;
+            }
+            
+            .responsive-table th,
+            .responsive-table td {
+                padding: 0.5rem 0.25rem;
+            }
+            
+            .account-name {
+                max-width: 150px;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+            
+            .balance-cell {
+                min-width: 80px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .responsive-table {
+                font-size: 0.75rem;
+            }
+            
+            .responsive-table th,
+            .responsive-table td {
+                padding: 0.375rem 0.125rem;
+            }
+            
+            .account-name {
+                max-width: 120px;
+            }
+        }

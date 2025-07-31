@@ -30,177 +30,47 @@
         <div class="card-header">
             <h2><i class="fas fa-user-tie"></i> All Suppliers</h2>
         </div>
-        <table class="table" id="suppliersTable">
-            <thead>
-                <tr>
-                    <th>Supplier Name</th>
-                    <th>Phone 1</th>
-                    <th>Email</th>
-                    <th>Address</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for supplier in suppliers %}
+        <div class="table-wrapper">
+            <table class="table" id="suppliersTable">
+                <thead>
                     <tr>
-                        <td>{{ supplier.supplier_name }}</td>
-                        <td>{{ supplier.phone_1 }}</td>
-                        <td>{{ supplier.email }}</td>
-                        <td>{{ supplier.address }}</td>
+                        <th>Supplier Name</th>
+                        <th>Phone 1</th>
+                        <th>Email</th>
+                        <th>Address</th>
                     </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="4">No suppliers found.</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    {% for supplier in suppliers %}
+                        <tr>
+                            <td>{{ supplier.supplier_name }}</td>
+                            <td>{{ supplier.phone_1 }}</td>
+                            <td>{{ supplier.email }}</td>
+                            <td>{{ supplier.address }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="4">No suppliers found.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-<style>
-    .container {
-        max-width: 1000px;
-        margin: 0 auto;
-        padding: 30px;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-    .page-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 30px;
-        border-bottom: 2px solid #eaeaea;
-        padding-bottom: 15px;
-    }
-    .page-title {
-        font-size: 28px;
-        color: #333;
-        margin: 0;
-    }
-    .action-buttons {
-        display: flex;
-        gap: 10px;
-    }
-    .btn {
-        padding: 10px 20px;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 14px;
-        transition: background-color 0.3s;
-    }
-    .btn-primary {
-        background-color: #007bff;
-        color: white;
-    }
-    .btn-primary:hover {
-        background-color: #0056b3;
-    }
-    .btn-success {
-        background-color: #28a745;
-        color: white;
-    }
-    .btn-success:hover {
-        background-color: #1e7e34;
-    }
-    .messages {
-        margin-bottom: 25px;
-    }
-    .messages p {
-        padding: 12px 15px;
-        border-radius: 6px;
-        margin: 10px 0;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-    .messages .error {
-        background-color: #ffebee;
-        color: #c62828;
-        border-left: 4px solid #c62828;
-    }
-    .messages .success {
-        background-color: #e8f5e9;
-        color: #2e7d32;
-        border-left: 4px solid #2e7d32;
-    }
-    .card {
-        background: #ffffff;
-        padding: 30px;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        margin-bottom: 25px;
-    }
-    .card-header {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        margin-bottom: 20px;
-    }
-    .table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 20px;
-    }
-    .table th, .table td {
-        padding: 12px;
-        text-align: left;
-        border-bottom: 1px solid #eee;
-    }
-    .table th {
-        background-color: #f8f8f8;
-        font-weight: 600;
-        color: #333;
-    }
-    .table tbody tr:hover {
-        background-color: #f9f9f9;
-    }
-    @media print {
-        body * {
-            visibility: hidden;
-        }
-        #suppliersTable, #suppliersTable * {
-            visibility: visible;
-        }
-        #suppliersTable {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-        }
-        .page-header, .action-buttons, .messages, .card-header {
-            display: none;
-        }
-    }
-</style>
 
-<script>
-function printTable() {
-    window.print();
-}
 
-function exportToExcel() {
-    const table = document.getElementById('suppliersTable');
-    let csv = [];
-    const rows = table.querySelectorAll('tr');
-    
-    for (const row of rows) {
-        const cols = row.querySelectorAll('td, th');
-        const rowData = Array.from(cols).map(col => `"${col.innerText.replace(/"/g, '""')}"`).join(',');
-        csv.push(rowData);
-    }
-    
-    const csvContent = csv.join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'suppliers_export.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-</script>
+<link rel="stylesheet" href="{% static 'images/css/supplier_inquiry.css' %}">
+
+
+
+
+
+
+<script src="{% static 'images/js/supplier_inquiry.js' %}"></script>
+
+
+
 {% endblock %}

@@ -27,18 +27,18 @@ SECRET_KEY = 'django-insecure-a7+j7@461#0lznh$(4pr-8$7j6%p+*2(v6)8h%7y_wf%k$p)9+
 DEBUG = True
 
 
-#ALLOWED_HOSTS = ['3.87.5.72', 'pos.com', 'localhost', '127.0.0.1']
+# ALLOWED_HOSTS = ['3.87.5.72', 'pos.com', 'localhost', '127.0.0.1']
 
-ALLOWED_HOSTS = ['pos.leniinfotech.in', 'www.pos.leniinfotech.in', '3.87.5.72']
-#ALLOWED_HOSTS = []
+#ALLOWED_HOSTS = ['pos.redcherryllc.com', 'www.pos.redcherryllc.com', '3.87.5.72']
+ALLOWED_HOSTS = []
 
 
-import os
-from dotenv import load_dotenv
-load_dotenv()
+# import os
+# from dotenv import load_dotenv
+# load_dotenv()
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
-DEBUG = os.getenv("DJANGO_DEBUG") == "True"
+# SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+# DEBUG = os.getenv("DJANGO_DEBUG") == "True"
 
 
 # Application definition

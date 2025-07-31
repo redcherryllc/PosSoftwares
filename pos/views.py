@@ -30,9 +30,8 @@ from .forms import StockReportForm, StockAdjustmentForm
 from django.shortcuts import get_object_or_404
 from django.core.paginator import Paginator
 from datetime import date
-from .forms import SupplierForm, EditSupplierForm
+from .forms import SupplierForm, EditSupplierForm, ProductForm, RoomForm, TableForm, VehicleForm, CustomerForm
 
-from .forms import ProductForm
 from .forms import EditProductGroupForm
 from dateutil import relativedelta 
 
@@ -48,6 +47,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models.functions import Cast, Substr
 
 from django.contrib.auth import logout
+
 
 logger = logging.getLogger(__name__)
 
@@ -3025,9 +3025,6 @@ def stock_return(request):
 
 
 
-
-
-
 @login_required
 def stock_report(request, product_id='1001'):
     saas_user_id = request.session.get('saas_user_id')
@@ -4314,3 +4311,723 @@ def po_detail(request, poid):
         logger.error(f"Error in po_detail: {str(e)}")
         messages.error(request, f"Error: {str(e)}")
         return redirect('login')    
+
+
+
+
+
+logger = logging.getLogger(__name__)
+
+
+def room_add(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in room_add: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+
+    if request.method == 'POST':
+        form = RoomForm(request.POST, business_unit=business_unit)
+        if form.is_valid():
+            room = form.save(commit=False)
+            room.business_unit = business_unit
+            room.create_by = user.saas_username
+
+            current_date = timezone.now().strftime('%Y-%m-%d')
+            room.create_remarks = f"Room created by {user.saas_username} on {current_date}"
+
+            room.update_dt = '1900-01-01'
+            room.update_tm = '1900-01-01'
+            room.update_by = ''
+            room.update_marks = ''
+            room.save()
+            messages.success(request, "Room added successfully.")
+            return redirect('room_list')
+    else:
+        form = RoomForm(business_unit=business_unit)
+
+    context = {
+        'form': form,
+        'username': user.saas_username,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'app_label': 'pos',
+    }
+    return render(request, 'room_add.html', context)
+
+def room_edit(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        room = get_object_or_404(Rooms, pk=pk, business_unit__business_unit_id=business_unit_id)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in room_edit: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+
+    if request.method == 'POST':
+        form = RoomForm(request.POST, instance=room, business_unit=business_unit)
+        if form.is_valid():
+            room = form.save(commit=False)
+
+            changed_fields = []
+            field_display_names = {
+                'room_type': 'Room Type',
+                'room_name': 'Room Name',
+                'location': 'Location',
+                'phone_1': 'Phone 1',
+                'phone_2': 'Phone 2',
+            }
+            for field in form.changed_data:
+                changed_fields.append(field_display_names.get(field, field))
+
+            room.update_dt = date.today()
+            room.update_tm = timezone.now()
+            room.update_by = user.saas_username[:10]
+            room.update_marks = (
+                f"Updated on {date.today().strftime('%Y-%m-%d')} by {user.saas_username[:10]}. "
+                f"Fields changed: {', '.join(changed_fields)}" if changed_fields
+                else f"Form submitted on {date.today().strftime('%Y-%m-%d')} by {user.saas_username[:10]} with no field changes"
+            )[:200]
+
+            room.business_unit = business_unit
+            room.save()
+            messages.success(request, "Room updated successfully.")
+            return redirect('room_list')
+    else:
+        form = RoomForm(instance=room, business_unit=business_unit)
+
+    context = {
+        'form': form,
+        'room': room,
+        'username': user.saas_username,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'app_label': 'pos',
+    }
+    return render(request, 'room_edit.html', context)
+
+def room_list(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        rooms = Rooms.objects.filter(business_unit=business_unit).order_by('-create_dt')
+        paginator = Paginator(rooms, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+
+        context = {
+            'page_obj': page_obj,
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'app_label': 'pos',
+        }
+        return render(request, 'room_list.html', context)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in room_list: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+
+def room_delete(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        room = get_object_or_404(Rooms, pk=pk, business_unit__business_unit_id=business_unit_id)
+        if request.method == 'POST':
+            room.delete()
+            messages.success(request, "Room deleted successfully.")
+            return redirect('room_list')
+
+        context = {
+            'object': room,
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'app_label': 'pos',
+        }
+        return render(request, 'room_confirm_delete.html', context)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in room_delete: {str(e)}")
+        messages.error(request, f"Error: {str(e)}")
+        return redirect('login')
+
+def room_inquiry(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        rooms = Rooms.objects.filter(business_unit=business_unit)
+
+        context = {
+            'rooms': rooms,
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'app_label': 'pos',
+        }
+        return render(request, 'room_inquiry.html', context)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in room_inquiry: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+
+def room_dashboard(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        room_count = Rooms.objects.filter(business_unit=business_unit).count()
+
+        context = {
+            'room_count': room_count,
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'app_label': 'pos',
+        }
+        return render(request, 'room_dashboard.html', context)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in room_dashboard: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+
+
+def table_add(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in table_add: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+
+    if request.method == 'POST':
+        form = TableForm(request.POST, business_unit=business_unit)
+        if form.is_valid():
+            table = form.save(commit=False)
+            table.business_unit = business_unit
+            table.create_by = user.saas_username
+
+            current_date = timezone.now().strftime('%Y-%m-%d')
+            table.create_remarks = f"Table created by {user.saas_username} on {current_date}"
+
+            table.update_dt = '1900-01-01'
+            table.update_tm = '1900-01-01'
+            table.update_by = ''
+            table.update_marks = ''
+            table.save()
+            messages.success(request, "Table added successfully.")
+            return redirect('table_list')
+    else:
+        form = TableForm(business_unit=business_unit)
+
+    context = {
+        'form': form,
+        'username': user.saas_username,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'app_label': 'pos',
+    }
+    return render(request, 'table_add.html', context)
+
+def table_edit(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        table = get_object_or_404(Tables, pk=pk, business_unit__business_unit_id=business_unit_id)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in table_edit: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+
+    if request.method == 'POST':
+        form = TableForm(request.POST, instance=table, business_unit=business_unit)
+        if form.is_valid():
+            table = form.save(commit=False)
+
+            changed_fields = []
+            field_display_names = {
+                'location': 'Location',
+                'no_of_seats': 'Number of Seats',
+            }
+            for field in form.changed_data:
+                changed_fields.append(field_display_names.get(field, field))
+
+            table.update_dt = date.today()
+            table.update_tm = timezone.now()
+            table.update_by = user.saas_username[:10]
+            table.update_marks = (
+                f"Updated on {date.today().strftime('%Y-%m-%d')} by {user.saas_username[:10]}. "
+                f"Fields changed: {', '.join(changed_fields)}" if changed_fields
+                else f"Form submitted on {date.today().strftime('%Y-%m-%d')} by {user.saas_username[:10]} with no field changes"
+            )[:200]
+
+            table.business_unit = business_unit
+            table.save()
+            messages.success(request, "Table updated successfully.")
+            return redirect('table_list')
+    else:
+        form = TableForm(instance=table, business_unit=business_unit)
+
+    context = {
+        'form': form,
+        'table': table,
+        'username': user.saas_username,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'app_label': 'pos',
+    }
+    return render(request, 'table_edit.html', context)
+
+def table_list(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        tables = Tables.objects.filter(business_unit=business_unit).order_by('-create_dt')
+        paginator = Paginator(tables, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+
+        context = {
+            'page_obj': page_obj,
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'app_label': 'pos',
+        }
+        return render(request, 'table_list.html', context)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in table_list: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+
+def table_delete(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        table = get_object_or_404(Tables, pk=pk, business_unit__business_unit_id=business_unit_id)
+        if request.method == 'POST':
+            table.delete()
+            messages.success(request, "Table deleted successfully.")
+            return redirect('table_list')
+
+        context = {
+            'object': table,
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'app_label': 'pos',
+        }
+        return render(request, 'table_confirm_delete.html', context)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in table_delete: {str(e)}")
+        messages.error(request, f"Error: {str(e)}")
+        return redirect('login')
+
+def table_inquiry(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        tables = Tables.objects.filter(business_unit=business_unit)
+
+        context = {
+            'tables': tables,
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'app_label': 'pos',
+        }
+        return render(request, 'table_inquiry.html', context)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in table_inquiry: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+
+def table_dashboard(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        table_count = Tables.objects.filter(business_unit=business_unit).count()
+
+        context = {
+            'table_count': table_count,
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'app_label': 'pos',
+        }
+        return render(request, 'table_dashboard.html', context)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in table_dashboard: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+
+
+def vehicle_add(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in vehicle_add: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+
+    if request.method == 'POST':
+        form = VehicleForm(request.POST, business_unit=business_unit)
+        if form.is_valid():
+            vehicle = form.save(commit=False)
+            vehicle.business_unit = business_unit
+            vehicle.create_by = user.saas_username
+
+            current_date = timezone.now().strftime('%Y-%m-%d')
+            vehicle.create_remarks = f"Vehicle created by {user.saas_username} on {current_date}"
+
+            vehicle.update_dt = '1900-01-01'
+            vehicle.update_tm = '1900-01-01'
+            vehicle.update_by = ''
+            vehicle.update_marks = ''
+            vehicle.save()
+            messages.success(request, "Vehicle added successfully.")
+            return redirect('vehicle_list')
+    else:
+        form = VehicleForm(business_unit=business_unit)
+
+    context = {
+        'form': form,
+        'username': user.saas_username,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'app_label': 'pos',
+    }
+    return render(request, 'vehicle_add.html', context)
+
+def vehicle_edit(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle = get_object_or_404(Vehicle, pk=pk, business_unit__business_unit_id=business_unit_id)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in vehicle_edit: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+
+    if request.method == 'POST':
+        form = VehicleForm(request.POST, instance=vehicle, business_unit=business_unit)
+        if form.is_valid():
+            vehicle = form.save(commit=False)
+
+            changed_fields = []
+            field_display_names = {
+                'vehicle_type': 'Vehicle Type',
+                'vehicle_name': 'Vehicle Name',
+            }
+            for field in form.changed_data:
+                changed_fields.append(field_display_names.get(field, field))
+
+            vehicle.update_dt = date.today()
+            vehicle.update_tm = timezone.now()
+            vehicle.update_by = user.saas_username[:10]
+            vehicle.update_marks = (
+                f"Updated on {date.today().strftime('%Y-%m-%d')} by {user.saas_username[:10]}. "
+                f"Fields changed: {', '.join(changed_fields)}" if changed_fields
+                else f"Form submitted on {date.today().strftime('%Y-%m-%d')} by {user.saas_username[:10]} with no field changes"
+            )[:200]
+
+            vehicle.business_unit = business_unit
+            vehicle.save()
+            messages.success(request, "Vehicle updated successfully.")
+            return redirect('vehicle_list')
+    else:
+        form = VehicleForm(instance=vehicle, business_unit=business_unit)
+
+    context = {
+        'form': form,
+        'vehicle': vehicle,
+        'username': user.saas_username,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'app_label': 'pos',
+    }
+    return render(request, 'vehicle_edit.html', context)
+
+def vehicle_list(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicles = Vehicle.objects.filter(business_unit=business_unit).order_by('-create_dt')
+        paginator = Paginator(vehicles, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+
+        context = {
+            'page_obj': page_obj,
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'app_label': 'pos',
+        }
+        return render(request, 'vehicle_list.html', context)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in vehicle_list: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+
+def vehicle_delete(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle = get_object_or_404(Vehicle, pk=pk, business_unit__business_unit_id=business_unit_id)
+        if request.method == 'POST':
+            vehicle.delete()
+            messages.success(request, "Vehicle deleted successfully.")
+            return redirect('vehicle_list')
+
+        context = {
+            'object': vehicle,
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'app_label': 'pos',
+        }
+        return render(request, 'vehicle_confirm_delete.html', context)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in vehicle_delete: {str(e)}")
+        messages.error(request, f"Error: {str(e)}")
+        return redirect('login')
+
+def vehicle_inquiry(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicles = Vehicle.objects.filter(business_unit=business_unit)
+
+        context = {
+            'vehicles': vehicles,
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'app_label': 'pos',
+        }
+        return render(request, 'vehicle_inquiry.html', context)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in vehicle_inquiry: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+
+def vehicle_dashboard(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+
+        context = {
+            'vehicle_count': vehicle_count,
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'app_label': 'pos',
+        }
+        return render(request, 'vehicle_dashboard.html', context)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in vehicle_dashboard: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')

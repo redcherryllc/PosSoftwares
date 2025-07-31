@@ -1,64 +1,61 @@
 {% extends "base.html" %}
-
 {% load static %}
 
 {% block content %}
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Customer-wise Bills</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-    <div class="container mt-5">
-        <h2>Customer-wise Bills</h2><br>
-        {% comment %} <p>Business Unit: {{ business_unit.business_unit_name }}</p>
-        <p>User: {{ username }}</p> {% endcomment %}
-       
-        {% comment %}
-            bills: {% for bill in bills %}
-                Customer ID: {{ bill.customer_id }}, Name: {{ bill.customer_name }}, Sale No: {{ bill.sale_no }}, Total: {{ bill.total_amount|floatformat:3 }}, Paid: {{ bill.paid_amount|floatformat:3 }}, Balance: {{ bill.balance|floatformat:3 }}
-            {% endfor %}
-            username: {{ username }}
-            business_unit: {{ business_unit.business_unit_name }}
-        {% endcomment %}
-        {% if messages %}
-            <div class="alert alert-info">
-                {% for message in messages %}
-                    {{ message }}
-                {% endfor %}
-            </div>
-        {% endif %}
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th>Customer ID</th>
-                    <th>Customer Name</th>
-                    <th>Bill No</th>
-                    <th>Bill Amount</th>
-                    <th>Paid</th>
-                    <th>Balance</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for bill in bills %}
-                <tr>
-                    <td>{{ bill.customer_id }}</td>
-                    <td>{{ bill.customer_name }}</td>
-                    <td>{{ bill.sale_no }}</td>
-                    <td>{{ bill.total_amount|floatformat:3 }}</td>
-                    <td>{{ bill.paid_amount|floatformat:3 }}</td>
-                    <td>{{ bill.balance|floatformat:3 }}</td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="6">No bills found.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% comment %} <a href="{% url 'home' %}" class="btn btn-secondary">⬅ Back to POS</a> {% endcomment %}
+
+<link rel="stylesheet" href="{% static 'images/css/customer_bills.css' %}">
+
+
+
+<div class="bills-container">
+    <div class="header-info">
+        <h2>Customer-wise Bills</h2>
+        <p>Business Unit: {{ business_unit.business_unit_name }}</p>
+        <p>User: {{ username }}</p>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
+
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+            <div class="message {{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if bills %}
+    <table class="bills-table">
+        <thead>
+            <tr>
+                <th>Customer ID</th>
+                <th>Customer Name</th>
+                <th>Bill No</th>
+                <th>Bill Amount</th>
+                <th>Paid</th>
+                <th>Balance</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for bill in bills %}
+            <tr>
+                <td>{{ bill.customer_id }}</td>
+                <td>{{ bill.customer_name }}</td>
+                <td>{{ bill.sale_no }}</td>
+                <td>{{ bill.total_amount|floatformat:3 }}</td>
+                <td>{{ bill.paid_amount|floatformat:3 }}</td>
+                <td>{{ bill.balance|floatformat:3 }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6">No bills found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p>No bills found.</p>
+    {% endif %}
+
+    
+</div>
+
 {% endblock content %}

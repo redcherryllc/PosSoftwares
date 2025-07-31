@@ -5,62 +5,51 @@
 {% block content %}
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, shrink-to-fit=no">
     <title>Customer-wise Summary</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
-    <div class="container mt-5">
-        <h2>Customer-wise Summary</h2><br>
-        {% comment %} <p>Customer: {{ saas_customer.saas_customer_name }}</p>
-        <p>Business Unit Group: {{ business_unit_group.business_unit_group_name }}</p>
-        <p>Business Unit: {{ business_unit.business_unit_name }}</p>
-        <p>Branch: {{ branch.branch_name }}</p>
-        <p>User: {{ username }}</p> {% endcomment %}
-        {% comment %}
-            summary: {% for item in summary %}
-                Customer ID: {{ item.customer_id }}, Name: {{ item.customer_name }}, Total: {{ item.total_amount|floatformat:3 }}, Paid: {{ item.paid_amount|floatformat:3 }}, Balance: {{ item.balance|floatformat:3 }}
-            {% endfor %}
-            username: {{ username }}
-            saas_customer: {{ saas_customer.saas_customer_name }}
-            business_unit_group: {{ business_unit_group.business_unit_group_name }}
-            business_unit: {{ business_unit.business_unit_name }}
-            branch: {{ branch.branch_name }}
-        {% endcomment %}
+    <div class="container-fluid py-4 px-3 px-md-4">
+        <h2 class="mb-3 text-center text-md-start">Customer-wise Summary</h2>
+        
         {% if messages %}
-            <div class="alert alert-info">
+            <div class="alert alert-info alert-dismissible fade show" role="alert">
                 {% for message in messages %}
                     {{ message }}
                 {% endfor %}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         {% endif %}
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th>Customer ID</th>
-                    <th>Customer Name</th>
-                    <th>Bill Amount</th>
-                    <th>Paid</th>
-                    <th>Balance</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in summary %}
-                <tr>
-                    <td>{{ item.customer_id }}</td>
-                    <td>{{ item.customer_name }}</td>
-                    <td>{{ item.total_amount|floatformat:3 }}</td>
-                    <td>{{ item.paid_amount|floatformat:3 }}</td>
-                    <td>{{ item.balance|floatformat:3 }}</td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="5">No customers found.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% comment %} <a href="{% url 'home' %}" class="btn btn-secondary">⬅ Back to POS</a> {% endcomment %}
+        <div class="table-responsive">
+            <table class="table table-striped table-hover">
+                <thead class="table-dark">
+                    <tr>
+                        <th scope="col">Customer ID</th>
+                        <th scope="col">Customer Name</th>
+                        <th scope="col">Bill Amount</th>
+                        <th scope="col">Paid</th>
+                        <th scope="col">Balance</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in summary %}
+                    <tr>
+                        <td>{{ item.customer_id }}</td>
+                        <td>{{ item.customer_name }}</td>
+                        <td>{{ item.total_amount|floatformat:3 }}</td>
+                        <td>{{ item.paid_amount|floatformat:3 }}</td>
+                        <td>{{ item.balance|floatformat:3 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center">No customers found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+      
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

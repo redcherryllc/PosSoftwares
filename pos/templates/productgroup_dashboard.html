@@ -12,18 +12,18 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body class="bg-gray-100">
-    <div class="container mx-auto p-6">
-        <header class="flex justify-between items-center mb-6">
-            <h1 class="text-2xl font-bold">Product Group Dashboard</h1>
-            <a href="{% url 'productgroup_inquiry' %}" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center">
+    <div class="container mx-auto p-4 sm:p-6">
+        <header class="flex flex-col sm:flex-row justify-between items-center mb-4 sm:mb-6 space-y-4 sm:space-y-0">
+            <h1 class="text-xl sm:text-2xl font-bold text-center sm:text-left">Product Group Dashboard</h1>
+            <a href="{% url 'productgroup_inquiry' %}" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center text-sm sm:text-base">
                 <i class="fas fa-list mr-2"></i> View All Product Groups
             </a>
         </header>
 
         {% if messages %}
-            <div class="mb-6">
+            <div class="mb-4 sm:mb-6">
                 {% for message in messages %}
-                    <div class="p-4 rounded-md
+                    <div class="p-3 sm:p-4 rounded-md text-sm sm:text-base
                         {% if message.tags == 'error' %}bg-red-100 text-red-700{% endif %}
                         {% if message.tags == 'success' %}bg-green-100 text-green-700{% endif %}
                         {% if message.tags == 'warning' %}bg-orange-100 text-orange-700{% endif %}">
@@ -33,20 +33,19 @@
             </div>
         {% endif %}
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             <div class="bg-white p-6 rounded-lg shadow-md flex items-center">
                 <div class="mr-4 text-green-600">
                     <i class="fas fa-folder fa-2x"></i>
                 </div>
                 <div>
-                    <h4 class="text-lg font-semibold text-gray-700">Total Product Groups</h4>
-                    <p class="text-2xl font-bold text-green-700">{{ product_group_count }}</p>
+                    <h4 class="text-base sm:text-lg font-semibold text-gray-700">Total Product Groups</h4>
+                    <p class="text-xl sm:text-2xl font-bold text-green-700">{{ product_group_count }}</p>
                 </div>
             </div>
-            
         </div>
 
-        <div class="mt-6 text-sm text-gray-600 flex items-center">
+        <div class="mt-4 sm:mt-6 text-xs sm:text-sm text-gray-600 flex items-center justify-center sm:justify-start">
             <i class="fas fa-lock mr-2"></i> Secure Data Access
         </div>
     </div>
