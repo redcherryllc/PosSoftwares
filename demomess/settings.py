@@ -29,16 +29,16 @@ DEBUG = True
 
 # ALLOWED_HOSTS = ['3.87.5.72', 'pos.com', 'localhost', '127.0.0.1']
 
-#ALLOWED_HOSTS = ['pos.redcherryllc.com', 'www.pos.redcherryllc.com', '3.87.5.72']
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['pos.redcherryllc.com', 'www.pos.redcherryllc.com', '3.87.5.72']
 
 
-# import os
-# from dotenv import load_dotenv
-# load_dotenv()
 
-# SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
-# DEBUG = os.getenv("DJANGO_DEBUG") == "True"
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+DEBUG = os.getenv("DJANGO_DEBUG") == "True"
 
 
 # Application definition
