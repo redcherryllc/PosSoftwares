@@ -29,7 +29,17 @@ DEBUG = True
 
 # ALLOWED_HOSTS = ['3.87.5.72', 'pos.com', 'localhost', '127.0.0.1']
 
-ALLOWED_HOSTS = ['pos.redcherryllc.com', 'www.pos.redcherryllc.com', '3.87.5.72']
+#ALLOWED_HOSTS = ['pos.redcherryllc.com', 'www.pos.redcherryllc.com', '3.87.5.72']
+
+
+ALLOWED_HOSTS = [
+    'pos.redcherryllc.com',
+    'www.pos.redcherryllc.com',
+    '3.87.5.72',
+    'localhost',
+    '127.0.0.1',
+]
+
 
 
 
