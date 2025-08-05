@@ -32,7 +32,7 @@ ALLOWED_HOSTS = ['3.87.5.72', 'localhost', '127.0.0.1']
 
 
 
-DEBUG = False  
+DEBUG = True 
 
 
 
