@@ -382,3 +382,108 @@ document.addEventListener('DOMContentLoaded', () => {
     updateTime();
     filterItems('all');
 });
+
+
+
+
+
+
+function initiatePayment() {
+        if (currentSaleItems.length === 0) {
+            alert('No items in sale! Please add items before proceeding to payment.');
+            return;
+        }
+    
+        saveSaleForPayment()
+            .then(data => {
+                if (data && data.sale_id) {
+                    const url = `/process_payment/?sale_id=${data.sale_id}`;
+                    window.location.href = url;
+                } else {
+                    alert('Failed to save sale. Please try again.');
+                }
+            })
+            .catch(error => {
+                console.error('Error initiating payment:', error);
+                alert('An error occurred while initiating payment. Please try again.');
+            });
+    }
+    
+    function saveSaleForPayment() {
+        return new Promise((resolve, reject) => {
+            if (currentSaleItems.length === 0) {
+                alert('No items to save!');
+                reject('No items');
+                return;
+            }
+    
+            const totals = calculateSaleTotals();
+    
+            const customerSelect = document.querySelector('select[name="customer_select"]');
+            const tableSelect = document.querySelector('select[name="table_select"]');
+            const roomSelect = document.querySelector('select[name="room_select"]');
+            const vehicleSelect = document.querySelector('select[name="vehicle_select"]');
+    
+            const customerId = customerSelect && customerSelect.selectedIndex > 0 ? customerSelect.value : null;
+            const tableId = tableSelect && tableSelect.selectedIndex > 0 ? tableSelect.value : null;
+            const roomId = roomSelect && roomSelect.selectedIndex > 0 ? roomSelect.value : null;
+            const vehicleId = vehicleSelect && vehicleSelect.selectedIndex > 0 ? vehicleSelect.value : null;
+    
+            if (!customerId) {
+                alert('Please select a customer before proceeding to payment.');
+                reject('No customer selected');
+                return;
+            }
+    
+            const saleData = {
+                items: currentSaleItems,
+                totals: {
+                    subtotal: totals.subtotal,
+                    discount: totals.discount,
+                    tax: totals.tax,
+                    grandTotal: totals.grandTotal
+                },
+                customer_id: customerId,
+                table_id: tableId,
+                room_id: roomId,
+                vehicle_id: vehicleId
+            };
+    
+            fetch('/api/save-sale/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify(saleData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success && data.sale_id) {
+                    clearSale(); 
+                    resolve(data); 
+                } else {
+                    reject('Failed to save sale');
+                }
+            })
+            .catch(error => {
+                console.error('Error saving sale:', error);
+                reject(error);
+            });
+        });
+    }
+
+
+
+ function toggleNav() {
+            document.querySelector('.nav-buttons').classList.toggle('active');
+            document.querySelector('.control-panel').classList.remove('active');
+            document.querySelectorAll('.overlay').forEach(overlay => overlay.classList.toggle('active', document.querySelector('.nav-buttons').classList.contains('active')));
+        }
+
+        function toggleControlPanel() {
+            document.querySelector('.control-panel').classList.toggle('active');
+            document.querySelector('.nav-buttons').classList.remove('active');
+            document.querySelectorAll('.overlay').forEach(overlay => overlay.classList.toggle('active', document.querySelector('.control-panel').classList.contains('active')));
+        }    
+

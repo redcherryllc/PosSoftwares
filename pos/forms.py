@@ -295,3 +295,52 @@ class SupplierPaymentForm(forms.ModelForm):
             if payment_amount <= 0:
                 raise forms.ValidationError("Payment amount must be greater than zero.")
         return cleaned_data    
+    
+
+
+
+
+class RoomForm(forms.ModelForm):
+    class Meta:
+        model = Rooms
+        fields = ['room_type', 'room_name', 'location', 'phone_1', 'phone_2']
+        widgets = {
+            'room_type': forms.TextInput(attrs={'class': 'form-control'}),
+            'room_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'location': forms.TextInput(attrs={'class': 'form-control'}),
+            'phone_1': forms.NumberInput(attrs={'class': 'form-control'}),
+            'phone_2': forms.NumberInput(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.business_unit = kwargs.pop('business_unit', None)
+        super().__init__(*args, **kwargs)
+
+
+
+
+class TableForm(forms.ModelForm):
+    class Meta:
+        model = Tables
+        fields = ['location', 'no_of_seats']
+        widgets = {
+            'location': forms.TextInput(attrs={'class': 'form-control'}),
+            'no_of_seats': forms.NumberInput(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.business_unit = kwargs.pop('business_unit', None)
+        super().__init__(*args, **kwargs)
+
+class VehicleForm(forms.ModelForm):
+    class Meta:
+        model = Vehicle
+        fields = ['vehicle_type', 'vehicle_name']
+        widgets = {
+            'vehicle_type': forms.TextInput(attrs={'class': 'form-control'}),
+            'vehicle_name': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.business_unit = kwargs.pop('business_unit', None)
+        super().__init__(*args, **kwargs)

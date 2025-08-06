@@ -11,15 +11,18 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body class="bg-gray-100">
-    <div class="container mx-auto p-6">
-        <header class="flex justify-between items-center mb-6">
-            <h1 class="text-2xl font-bold">Product Group Inquiry</h1>
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <header class="flex flex-col sm:flex-row justify-between items-center mb-6">
+            <h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-0">Product Group Inquiry</h1>
+            <a href="{% url 'productgroup_add' %}" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center w-full sm:w-auto justify-center sm:justify-start">
+                <i class="fas fa-plus mr-2"></i> Add New Product Group
+            </a>
         </header>
 
-        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-xl font-semibold">Product Groups</h2>
-                <a href="{% url 'productgroup_add' %}" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center">
+        <div class="bg-white p-4 sm:p-6 rounded-lg shadow-md mb-6">
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-4">
+                <h2 class="text-lg sm:text-xl font-semibold mb-4 sm:mb-0">Product Groups</h2>
+                <a href="{% url 'productgroup_add' %}" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 flex items-center w-full sm:w-auto justify-center sm:justify-start sm:hidden">
                     <i class="fas fa-plus mr-2"></i> Add New Product Group
                 </a>
             </div>
@@ -27,7 +30,7 @@
             {% if messages %}
                 <div class="mb-4">
                     {% for message in messages %}
-                        <div class="p-4 rounded-md
+                        <div class="p-3 sm:p-4 rounded-md text-sm sm:text-base
                             {% if message.tags == 'error' %}bg-red-100 text-red-700{% endif %}
                             {% if message.tags == 'success' %}bg-green-100 text-green-700{% endif %}
                             {% if message.tags == 'warning' %}bg-orange-100 text-orange-700{% endif %}">
@@ -39,12 +42,12 @@
 
             {% if product_groups %}
                 <div class="overflow-x-auto">
-                    <table class="w-full border-collapse">
+                    <table class="w-full border-collapse text-sm sm:text-base">
                         <thead>
                             <tr class="bg-gray-200">
-                                <th class="border p-2 text-left">Name</th>
-                                <th class="border p-2 text-left">Created</th>
-                                <th class="border p-2 text-left">Remarks</th>
+                                <th class="border p-2 text-left font-medium">Name</th>
+                                <th class="border p-2 text-left font-medium">Created</th>
+                                <th class="border p-2 text-left font-medium">Remarks</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -59,13 +62,13 @@
                     </table>
                 </div>
             {% else %}
-                <div class="text-center p-4 text-gray-600">
+                <div class="text-center p-4 text-gray-600 text-sm sm:text-base">
                     No product groups found.
                 </div>
             {% endif %}
         </div>
 
-        <div class="text-sm text-gray-600 flex items-center">
+        <div class="text-xs sm:text-sm text-gray-600 flex items-center justify-center sm:justify-start">
             <i class="fas fa-lock mr-2"></i> Secure Data Access
         </div>
     </div>

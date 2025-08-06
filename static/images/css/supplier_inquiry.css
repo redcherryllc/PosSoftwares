@@ -1,0 +1,205 @@
+* {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+    .container {
+        max-width: 100%;
+        width: 100%;
+        margin: 0 auto;
+        padding: 2rem 1rem;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+
+    .page-header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        border-bottom: 2px solid #eaeaea;
+        padding-bottom: 1rem;
+        gap: 1rem;
+    }
+
+    .page-title {
+        font-size: clamp(1.5rem, 5vw, 1.75rem);
+        color: #333;
+        margin: 0;
+    }
+
+    .action-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .btn {
+        padding: 0.5rem 1rem;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: clamp(0.875rem, 2.5vw, 0.9375rem);
+        transition: background-color 0.3s;
+        white-space: nowrap;
+    }
+
+    .btn-primary {
+        background-color: #007bff;
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background-color: #0056b3;
+    }
+
+    .btn-success {
+        background-color: #28a745;
+        color: white;
+    }
+
+    .btn-success:hover {
+        background-color: #1e7e34;
+    }
+
+    .messages {
+        margin-bottom: 1.5rem;
+    }
+
+    .messages p {
+        padding: 0.75rem 1rem;
+        border-radius: 6px;
+        margin: 0.5rem 0;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: clamp(0.875rem, 2.5vw, 1rem);
+    }
+
+    .messages .error {
+        background-color: #ffebee;
+        color: #c62828;
+        border-left: 4px solid #c62828;
+    }
+
+    .messages .success {
+        background-color: #e8f5e9;
+        color: #2e7d32;
+        border-left: 4px solid #2e7d32;
+    }
+
+    .card {
+        background: #ffffff;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        margin-bottom: 1.5rem;
+    }
+
+    .card-header {
+        display: flex;
+        align-items: center;
+        gap: 0.625rem;
+        margin-bottom: 1rem;
+    }
+
+    .card-header h2 {
+        font-size: clamp(1.25rem, 4vw, 1.5rem);
+    }
+
+    .table-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 1rem;
+    }
+
+    .table th, .table td {
+        padding: 0.75rem;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+        font-size: clamp(0.8125rem, 2.5vw, 0.875rem);
+    }
+
+    .table th {
+        background-color: #f8f8f8;
+        font-weight: 600;
+        color: #333;
+        white-space: nowrap;
+    }
+
+    .table tbody tr:hover {
+        background-color: #f9f9f9;
+    }
+
+    
+    @media screen and (max-width: 768px) {
+        .page-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .action-buttons {
+            width: 100%;
+            justify-content: flex-start;
+        }
+
+        .btn {
+            flex: 1;
+            text-align: center;
+        }
+
+        .table th, .table td {
+            padding: 0.5rem;
+        }
+    }
+
+    @media screen and (max-width: 480px) {
+        .container {
+            padding: 1rem 0.5rem;
+        }
+
+        .page-title {
+            font-size: clamp(1.25rem, 5vw, 1.5rem);
+        }
+
+        .btn {
+            padding: 0.5rem;
+            font-size: clamp(0.75rem, 2.5vw, 0.875rem);
+        }
+
+        .table th, .table td {
+            font-size: clamp(0.75rem, 2.5vw, 0.8125rem);
+        }
+
+        .card {
+            padding: 1rem;
+        }
+    }
+
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        #suppliersTable, #suppliersTable * {
+            visibility: visible;
+        }
+        #suppliersTable {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+        .page-header, .action-buttons, .messages, .card-header {
+            display: none;
+        }
+        .table th, .table td {
+            font-size: 12pt;
+            padding: 8pt;
+        }
+    }

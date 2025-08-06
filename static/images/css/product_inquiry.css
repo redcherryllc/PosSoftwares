@@ -1,0 +1,48 @@
+@media (max-width: 640px) {
+            .container {
+                padding: 1rem;
+            }
+            h1 {
+                font-size: 1.5rem;
+            }
+            h2 {
+                font-size: 1.25rem;
+            }
+            .table-responsive {
+                font-size: 0.875rem;
+            }
+            .table-responsive th,
+            .table-responsive td {
+                padding: 0.5rem;
+            }
+            .add-button {
+                padding: 0.5rem 1rem;
+                font-size: 0.875rem;
+            }
+            .message-box {
+                padding: 0.75rem;
+                font-size: 0.875rem;
+            }
+            .secure-data {
+                font-size: 0.75rem;
+            }
+        }
+        @media (min-width: 641px) and (max-width: 1024px) {
+            .container {
+                padding: 1.5rem;
+            }
+            h1 {
+                font-size: 1.75rem;
+            }
+            h2 {
+                font-size: 1.5rem;
+            }
+            .add-button {
+                padding: 0.75rem 1.5rem;
+            }
+        }
+       
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }

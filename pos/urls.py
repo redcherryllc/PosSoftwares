@@ -121,4 +121,29 @@ path('confirm_supplier_payment/', views.confirm_supplier_payment, name='confirm_
  path('po_detail/<int:poid>/', views.po_detail, name='po_detail'),
 
 
+ path('room/add/', views.room_add, name='room_add'),
+    path('room/edit/<int:pk>/', views.room_edit, name='room_edit'),
+    path('room/list/', views.room_list, name='room_list'),
+    path('room/delete/<int:pk>/', views.room_delete, name='room_delete'),
+    path('room/inquiry/', views.room_inquiry, name='room_inquiry'),
+    path('room/dashboard/', views.room_dashboard, name='room_dashboard'),
+
+
+path('table/add/', views.table_add, name='table_add'),
+    path('table/edit/<int:pk>/', views.table_edit, name='table_edit'),
+    path('table/list/', views.table_list, name='table_list'),
+    path('table/delete/<int:pk>/', views.table_delete, name='table_delete'),
+    path('table/inquiry/', views.table_inquiry, name='table_inquiry'),
+    path('table/dashboard/', views.table_dashboard, name='table_dashboard'),
+
+    path('vehicle/add/', views.vehicle_add, name='vehicle_add'),
+    path('vehicle/edit/<int:pk>/', views.vehicle_edit, name='vehicle_edit'),
+    path('vehicle/list/', views.vehicle_list, name='vehicle_list'),
+    path('vehicle/delete/<int:pk>/', views.vehicle_delete, name='vehicle_delete'),
+    path('vehicle/inquiry/', views.vehicle_inquiry, name='vehicle_inquiry'),
+    path('vehicle/dashboard/', views.vehicle_dashboard, name='vehicle_dashboard'),
+
+ 
+
+
 ]

@@ -332,6 +332,8 @@ class Vehicle(models.Model):
         db_table = 'VEHCILE'
     def __str__(self):
          return self.vehicle_name
+
+
 class Rooms(models.Model):
     room_id = models.BigAutoField(primary_key=True)
     business_unit = models.ForeignKey(BusinessUnit, on_delete=models.CASCADE, db_column='business_unit_id')

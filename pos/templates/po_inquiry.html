@@ -6,59 +6,31 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Purchase Order Inquiry</title>
+    <link rel="stylesheet" href="{% static 'images/css/po_inquiry.css' %}">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <style>
-        @media print {
-            body * {
-                visibility: hidden;
-            }
-            #purchase-order-table, #purchase-order-table * {
-                visibility: visible;
-            }
-            #purchase-order-table {
-                position: absolute;
-                left: 0;
-                top: 0;
-            }
-            .no-print {
-                display: none;
-            }
-        }
-        .hidden-row {
-            display: none;
-        }
-        .disabled-link {
-            color: #9ca3af;
-            cursor: not-allowed;
-            text-decoration: none;
-        }
-        .disabled-link:hover {
-            text-decoration: none;
-            color: #9ca3af;
-        }
-    </style>
+    
 </head>
-<body class="bg-gray-100">
-    <div class="container mx-auto p-6">
-        <header class="flex justify-between items-center mb-6 no-print">
-            <h1 class="text-2xl font-bold">Purchase Order Inquiry</h1>
+<body class="bg-gray-100 font-sans">
+    <div class="container mx-auto p-4 sm:p-6 max-w-full">
+        <header class="flex flex-col sm:flex-row justify-between items-center mb-4 sm:mb-6 no-print">
+            <h1 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-0">Purchase Order Inquiry</h1>
         </header>
 
-        <div class="bg-white p-6 rounded-lg shadow-md mb-6 no-print">
-            <form id="dateFilterForm" method="GET" class="flex space-x-4">
-                <div>
-                    <label for="start_date" class="block text-sm font-medium">Start Date</label>
+        <div class="bg-white p-4 sm:p-6 rounded-lg shadow-md mb-4 sm:mb-6 no-print">
+            <form id="dateFilterForm" method="GET" class="flex flex-col sm:flex-row sm:space-x-4 space-y-4 sm:space-y-0">
+                <div class="w-full sm:w-auto">
+                    <label for="start_date" class="block text-sm font-medium text-gray-700">Start Date</label>
                     <input type="date" id="start_date" name="start_date" value="{{ start_date|date:'Y-m-d' }}"
-                           class="mt-1 p-2 border rounded-md">
+                           class="mt-1 p-2 w-full border rounded-md focus:ring-blue-500 focus:border-blue-500">
                 </div>
-                <div>
-                    <label for="end_date" class="block text-sm font-medium">End Date</label>
+                <div class="w-full sm:w-auto">
+                    <label for="end_date" class="block text-sm font-medium text-gray-700">End Date</label>
                     <input type="date" id="end_date" name="end_date" value="{{ end_date|date:'Y-m-d' }}"
-                           class="mt-1 p-2 border rounded-md">
+                           class="mt-1 p-2 w-full border rounded-md focus:ring-blue-500 focus:border-blue-500">
                 </div>
                 <div class="flex items-end">
-                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 w-full sm:w-auto">
                         Filter
                     </button>
                 </div>
@@ -66,30 +38,30 @@
         </div>
 
         {% if messages %}
-            <div class="mb-6 no-print">
+            <div class="mb-4 sm:mb-6 no-print">
                 {% for message in messages %}
-                    <div class="bg-red-100 text-red-700 p-4 rounded-md">{{ message }}</div>
+                    <div class="bg-red-100 text-red-700 p-4 rounded-md" role="alert">{{ message }}</div>
                 {% endfor %}
             </div>
         {% endif %}
 
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="flex justify-between items-center mb-4 no-print">
-                <h2 class="text-xl font-semibold">Purchase Orders</h2>
-                <div class="space-x-2">
-                    <button onclick="printTable()" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700">
+        <div class="bg-white p-4 sm:p-6 rounded-lg shadow-md">
+            <div class="flex flex-col sm:flex-row justify-between items-center mb-4 no-print">
+                <h2 class="text-lg sm:text-xl font-semibold mb-4 sm:mb-0">Purchase Orders</h2>
+                <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+                    <button onclick="printTable()" class="bg-gray-600 text-white px-4 py-2 rounded-md hover:bg-gray-700 w-full sm:w-auto">
                         Print Table
                     </button>
-                    <button onclick="exportToExcel()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700">
+                    <button onclick="exportToExcel()" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 w-full sm:w-auto">
                         Export to Excel
                     </button>
-                    <button onclick="resetFilters()" class="bg-gray-400 text-white px-4 py-2 rounded-md hover:bg-gray-500">
+                    <button onclick="resetFilters()" class="bg-gray-400 text-white px-4 py-2 rounded-md hover:bg-gray-500 w-full sm:w-auto">
                         Reset Filters
                     </button>
                 </div>
             </div>
-            <div id="table-container">
-                <table id="purchase-order-table" class="w-full border-collapse">
+            <div id="table-container" class="overflow-x-auto">
+                <table id="purchase-order-table" class="w-full border-collapse text-sm sm:text-base">
                     <thead>
                         <tr class="bg-gray-200">
                             <th class="border p-2 text-left">PO Number</th>
@@ -124,9 +96,9 @@
                                 <td class="border p-2 text-center" data-value="{{ po.items_list.count }}">{{ po.items_list.count }}</td>
                                 <td class="border p-2 text-center no-print">
                                     {% if po.postatus == 'Paid' %}
-                                        <span class="disabled-link">Fully Paid</span>
+                                        <span class="disabled-link" aria-disabled="true">Fully Paid</span>
                                     {% else %}
-                                        <a href="{% url 'supplier_payment' po.poid %}" class="text-blue-600 hover:underline">Make Payment</a>
+                                        <a href="{% url 'supplier_payment' po.poid %}" class="text-blue-600 hover:underline" aria-label="Make payment for PO {{ po.pono }}">Make Payment</a>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -141,150 +113,10 @@
         </div>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const startDate = urlParams.get('start_date');
-            const endDate = urlParams.get('end_date');
-            
-            if (startDate) {
-                document.getElementById('start_date').value = startDate;
-            }
-            if (endDate) {
-                document.getElementById('end_date').value = endDate;
-            }
-            if (startDate || endDate) {
-                filterTableByDate();
-            }
-        });
 
-        function resetFilters() {
-            document.getElementById('start_date').value = '';
-            document.getElementById('end_date').value = '';
-            window.location.href = window.location.pathname;
-        }
+    <script src="{% static 'images/js/po_inquiry.js' %}"></script>
 
-        function filterTableByDate() {
-            const startDate = document.getElementById('start_date').value;
-            const endDate = document.getElementById('end_date').value;
-            const rows = document.querySelectorAll('.po-row');
-            let visibleCount = 0;
 
-            rows.forEach(row => {
-                const orderDate = row.getAttribute('data-order-date');
-                if (startDate && endDate) {
-                    if (orderDate >= startDate && orderDate <= endDate) {
-                        row.classList.remove('hidden-row');
-                        visibleCount++;
-                    } else {
-                        row.classList.add('hidden-row');
-                    }
-                } else if (startDate) {
-                    if (orderDate >= startDate) {
-                        row.classList.remove('hidden-row');
-                        visibleCount++;
-                    } else {
-                        row.classList.add('hidden-row');
-                    }
-                } else if (endDate) {
-                    if (orderDate <= endDate) {
-                        row.classList.remove('hidden-row');
-                        visibleCount++;
-                    } else {
-                        row.classList.add('hidden-row');
-                    }
-                } else {
-                    row.classList.remove('hidden-row');
-                    visibleCount++;
-                }
-            });
-
-            const noResultsRow = document.getElementById('no-results-row');
-            if (visibleCount === 0) {
-                if (!noResultsRow) {
-                    const tbody = document.getElementById('po-table-body');
-                    const newRow = document.createElement('tr');
-                    newRow.id = 'no-results-row';
-                    newRow.innerHTML = '<td colspan="8" class="border p-2 text-center">No purchase orders found matching the date criteria.</td>';
-                    tbody.appendChild(newRow);
-                } else {
-                    noResultsRow.classList.remove('hidden-row');
-                }
-            } else if (noResultsRow) {
-                noResultsRow.classList.add('hidden-row');
-            }
-        }
-
-        document.getElementById('dateFilterForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            filterTableByDate();
-            const startDate = document.getElementById('start_date').value;
-            const endDate = document.getElementById('end_date').value;
-            const url = new URL(window.location);
-            if (startDate) {
-                url.searchParams.set('start_date', startDate);
-            } else {
-                url.searchParams.delete('start_date');
-            }
-            if (endDate) {
-                url.searchParams.set('end_date', endDate);
-            } else {
-                url.searchParams.delete('end_date');
-            }
-            window.history.pushState({}, '', url);
-        });
-
-        function printTable() {
-            window.print();
-        }
-
-        function exportToExcel() {
-            const wb = XLSX.utils.book_new();
-            const tableData = [];
-            const headerRow = [];
-            const headerCells = document.querySelectorAll('#purchase-order-table thead th');
-            headerCells.forEach(cell => {
-                if (!cell.classList.contains('no-print')) {
-                    headerRow.push(cell.textContent.trim());
-                }
-            });
-            tableData.push(headerRow);
-
-            const rows = document.querySelectorAll('#purchase-order-table tbody tr:not(.hidden-row)');
-            rows.forEach(row => {
-                if (row.cells.length > 1) {
-                    const dataRow = [];
-                    Array.from(row.cells).forEach((cell, index) => {
-                        if (!cell.classList.contains('no-print')) {
-                            if ([2, 3, 4].includes(index) && cell.hasAttribute('data-value')) {
-                                const value = cell.getAttribute('data-value');
-                                dataRow.push(value === "" ? 0 : parseFloat(value));
-                            } else if (index === 6) {
-                                const value = cell.getAttribute('data-value');
-                                dataRow.push(value === "" ? 0 : parseInt(value));
-                            } else {
-                                dataRow.push(cell.textContent.trim());
-                            }
-                        }
-                    });
-                    tableData.push(dataRow);
-                }
-            });
-
-            const ws = XLSX.utils.aoa_to_sheet(tableData);
-            const columnFormats = [
-                {wch: 15}, // PO Number
-                {wch: 30}, // Supplier
-                {wch: 15}, // Total Amount
-                {wch: 15}, // Paid Amount
-                {wch: 15}, // Balance Due
-                {wch: 15}, // Payment Status
-                {wch: 15}  // Order Items Count
-            ];
-            ws['!cols'] = columnFormats;
-            XLSX.utils.book_append_sheet(wb, ws, "Purchase Orders");
-            XLSX.writeFile(wb, "purchase_order_inquiry.xlsx");
-        }
-    </script>
 </body>
 {% endblock %}
+

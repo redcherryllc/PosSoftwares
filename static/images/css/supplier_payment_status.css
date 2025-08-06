@@ -1,0 +1,26 @@
+table th {
+        font-size: 16px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        border-bottom: 2px solid #ddd;
+    }
+    table td {
+        font-size: 15px;
+        color: #555;
+    }
+    tbody tr:hover {
+        background-color: #e0f7fa;
+        transform: scale(1.02);
+        cursor: pointer;
+    }
+    tbody tr:nth-child(odd) {
+        background-color: #f9f9f9;
+    }
+    tbody tr:nth-child(even) {
+        background-color: white;
+    }
+    tbody tr td {
+        padding: 12px;
+        border-bottom: 1px solid #ddd;
+    }

@@ -1,0 +1,205 @@
+.container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        .messages {
+            margin-bottom: 20px;
+        }
+        .messages p {
+            padding: 10px 12px;
+            border-radius: 6px;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+        .messages .error {
+            background-color: #ffebee;
+            color: #c62828;
+            border-left: 4px solid #c62828;
+        }
+        .messages .success {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+            border-left: 4px solid #2e7d32;
+        }
+        .messages .warning {
+            background-color: #fff8e1;
+            color: #f57c00;
+            border-left: 4px solid #f57c00;
+        }
+        .card {
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        .form-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .form-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        .form-group.full-width {
+            flex: 0 0 100%;
+            max-width: 100%;
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: #444;
+            font-size: 14px;
+        }
+        select, input[type="number"], input[type="text"], input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            box-sizing: border-box;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+        select:focus, input:focus {
+            outline: none;
+            border-color: #4a90e2;
+            box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+        }
+        .form-check-input {
+            margin-right: 6px;
+        }
+        .form-check-label {
+            font-size: 13px;
+            color: #444;
+        }
+        .btn-container {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+            gap: 10px;
+        }
+        .btn-primary {
+            padding: 10px 20px;
+            background-color: #0066cc;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: background-color 0.2s;
+            flex: 1;
+            justify-content: center;
+        }
+        .btn-primary:disabled {
+            background-color: #a0a0a0;
+            cursor: not-allowed;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background-color: #0052a3;
+        }
+        .cancel-link {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #666;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 14px;
+            transition: color 0.2s;
+            flex: 1;
+            justify-content: center;
+        }
+        .cancel-link:hover {
+            color: #333;
+        }
+        .secure-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: #777;
+            font-size: 12px;
+            margin-top: 20px;
+            justify-content: center;
+        }
+        .card-header {
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        .card-header h2 {
+            margin: 0;
+            color: #333;
+            font-size: 18px;
+        }
+        .helper-text {
+            font-size: 12px;
+            color: #777;
+            margin-top: 4px;
+        }
+        .invalid-feedback {
+            font-size: 12px;
+            color: #c62828;
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .is-invalid {
+            border-color: #c62828 !important;
+        }
+
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 15px;
+            }
+            .card {
+                padding: 15px;
+            }
+            .form-row {
+                flex-direction: column;
+                gap: 10px;
+            }
+            .form-group {
+                min-width: 100%;
+            }
+            .btn-container {
+                flex-direction: column;
+                gap: 10px;
+            }
+            .btn-primary, .cancel-link {
+                width: 100%;
+                text-align: center;
+            }
+            .card-header h2 {
+                font-size: 16px;
+            }
+            label {
+                font-size: 13px;
+            }
+            select, input[type="number"], input[type="text"], input[type="file"] {
+                font-size: 13px;
+                padding: 8px;
+            }
+            .helper-text, .invalid-feedback {
+                font-size: 11px;
+            }
+            .secure-badge {
+                font-size: 11px;
+            }
+            img {
+                max-width: 100%;
+                height: auto;
+            }
+        }

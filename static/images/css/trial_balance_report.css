@@ -1,0 +1,41 @@
+ @media print {
+            body * {
+                visibility: hidden;
+            }
+            #trial-balance-table, #trial-balance-table * {
+                visibility: visible;
+            }
+            #trial-balance-table {
+                position: absolute;
+                left: 0;
+                top: 0;
+            }
+            .no-print {
+                display: none;
+            }
+        }
+        
+     
+        @media (max-width: 768px) {
+            .responsive-table {
+                font-size: 0.875rem;
+            }
+            .responsive-table th,
+            .responsive-table td {
+                padding: 0.5rem 0.25rem;
+            }
+            
+            .hide-on-mobile {
+                display: none;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .responsive-table {
+                font-size: 0.75rem;
+            }
+            .responsive-table th,
+            .responsive-table td {
+                padding: 0.25rem;
+            }
+        }

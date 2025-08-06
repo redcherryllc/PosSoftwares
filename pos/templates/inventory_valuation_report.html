@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-
 {% load static %}
 
 {% block content %}
@@ -7,27 +6,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventory Valuation Report</title>
-    <style>
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-        tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-    </style>
+    <link rel="stylesheet" href="{% static 'images/css/inventory_valuation_report.css' %}">
+ 
 </head>
 <body>
     <h2>Inventory Valuation Report</h2>
+    
+    <div class="no-print">
+        <p>Report generated on {% now "F j, Y" %}</p>
+    </div>
+    
     <table>
         <thead>
             <tr>
@@ -58,3 +46,5 @@
     </table>
 </body>
 {% endblock content %}
+
+

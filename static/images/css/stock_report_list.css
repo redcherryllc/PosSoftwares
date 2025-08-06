@@ -1,0 +1,166 @@
+body {
+            background-color: #f5f7fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 1rem;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            margin: 1rem auto;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 1.5rem;
+            max-width: 100%;
+            width: 95%;
+        }
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 1.5rem;
+            font-size: calc(1.5rem + 1vw);
+            text-align: center;
+        }
+        .table-responsive {
+            border-radius: 8px;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        .table th, .table td {
+            vertical-align: middle;
+            text-align: center;
+            font-size: 0.9rem;
+            padding: 0.75rem;
+        }
+        .table thead th {
+            background-color: #343a40;
+            color: #fff;
+            border: none;
+            font-size: 0.95rem;
+        }
+        .table tbody tr:hover {
+            background-color: #f1f3f5;
+            transition: background-color 0.3s;
+        }
+        .low-stock {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .excess-stock {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .return-stock {
+            color: #ff851b;
+            font-weight: bold;
+        }
+        .alert {
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            font-size: 0.9rem;
+        }
+        .dataTables_wrapper .dataTables_filter input {
+            border-radius: 20px;
+            padding: 0.5rem;
+            margin-bottom: 1rem;
+            width: 100%;
+            max-width: 300px;
+        }
+        .dt-buttons {
+            margin-bottom: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+        }
+        .dt-buttons .btn {
+            border-radius: 20px;
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border: none;
+            flex: 1 1 auto;
+            max-width: 200px;
+        }
+        .dt-buttons .buttons-excel {
+            background-color: #28a745;
+            color: #fff;
+        }
+        .dt-buttons .buttons-excel:hover {
+            background-color: #218838;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        .dt-buttons .buttons-print {
+            background-color: #007bff;
+            color: #fff;
+        }
+        .dt-buttons .buttons-print:hover {
+            background-color: #0056b3;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        .dt-buttons .btn i {
+            margin-right: 0.3rem;
+        }
+        .dataTables_wrapper .sorting::after,
+        .dataTables_wrapper .sorting_asc::after,
+        .dataTables_wrapper .sorting_desc::after,
+        .dataTables_wrapper .sorting::before,
+        .dataTables_wrapper .sorting_asc::before,
+        .dataTables_wrapper .sorting_desc::before {
+            display: none !important;
+        }
+        .dataTables_wrapper .sorting,
+        .dataTables_wrapper .sorting_asc,
+        .dataTables_wrapper .sorting_desc {
+            cursor: default;
+        }
+
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 1rem;
+                margin: 0.5rem;
+            }
+            h2 {
+                font-size: calc(1.2rem + 1vw);
+            }
+            .table th, .table td {
+                font-size: 0.8rem;
+                padding: 0.5rem;
+            }
+            .table thead th {
+                font-size: 0.85rem;
+            }
+            .dt-buttons .btn {
+                font-size: 0.8rem;
+                padding: 0.4rem 0.8rem;
+                max-width: 150px;
+            }
+            .dataTables_wrapper .dataTables_filter input {
+                max-width: 100%;
+            }
+        }
+
+        @media (max-width: 576px) {
+            h2 {
+                font-size: calc(1rem + 1vw);
+            }
+            .table th, .table td {
+                font-size: 0.75rem;
+                padding: 0.4rem;
+            }
+            .table thead th {
+                font-size: 0.8rem;
+            }
+            .dt-buttons {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .dt-buttons .btn {
+                max-width: 100%;
+                margin-bottom: 0.5rem;
+            }
+            .alert {
+                font-size: 0.8rem;
+            }
+        }

@@ -1,0 +1,38 @@
+.table-container {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+
+        @media (max-width: 640px) {
+            table {
+                font-size: 0.75rem; 
+            }
+            th, td {
+                padding: 4px; 
+                white-space: nowrap; 
+            }
+        }
+
+        
+        @media print {
+            body * { visibility: hidden; }
+            #reportSection, #reportSection * { visibility: visible; }
+            #reportSection {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                padding: 10px;
+            }
+            .no-print { display: none; }
+            table {
+                font-size: 8pt; 
+            }
+            th, td {
+                padding: 4px; 
+            }
+            .table-container {
+                overflow-x: visible; 
+            }
+        }

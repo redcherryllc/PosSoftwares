@@ -1,0 +1,218 @@
+ .container {
+        max-width: 90vw;
+        margin: 0 auto;
+        padding: 2rem;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        box-sizing: border-box;
+    }
+
+   
+    .page-header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+        border-bottom: 2px solid #eaeaea;
+        padding-bottom: 1rem;
+        gap: 1rem;
+    }
+
+    .page-title {
+        font-size: clamp(1.5rem, 5vw, 1.8rem);
+        color: #333;
+        margin: 0;
+        flex: 1;
+    }
+
+    
+    .messages {
+        margin-bottom: 1.5rem;
+    }
+
+    .messages p {
+        padding: 0.75rem 1rem;
+        border-radius: 6px;
+        margin: 0.5rem 0;
+        font-size: clamp(0.9rem, 2.5vw, 1rem);
+    }
+
+    .messages .error {
+        background-color: #ffebee;
+        color: #c62828;
+        border-left: 4px solid #c62828;
+    }
+
+    .messages .success {
+        background-color: #e8f5e9;
+        color: #2e7d32;
+        border-left: 4px solid #2e7d32;
+    }
+
+  
+    .card {
+        background: #ffffff;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        margin-bottom: 1.5rem;
+    }
+
+    .card-header h2 {
+        font-size: clamp(1.2rem, 4vw, 1.5rem);
+        margin: 0 0 1rem;
+    }
+
+    .table-container {
+        max-width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .table {
+        width: 100%;
+        min-width: 600px; 
+        border-collapse: collapse;
+        margin-bottom: 1rem;
+    }
+
+    .table th, .table td {
+        padding: 0.8rem;
+        text-align: left;
+        border-bottom: 1px solid #eee;
+        font-size: clamp(0.85rem, 2.2vw, 0.95rem);
+    }
+
+    .table tr {
+        height: 3.5rem;
+    }
+
+    .table th {
+        background-color: #f8f8f8;
+        font-weight: 600;
+        color: #333;
+        white-space: nowrap;
+    }
+
+    .table td {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 200px; 
+    }
+
+  
+    .actions {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        white-space: nowrap;
+    }
+
+    .action-icon {
+        color: #0066cc;
+        text-decoration: none;
+        font-size: clamp(0.9rem, 2.5vw, 1rem);
+    }
+
+    .action-icon.text-danger {
+        color: #c62828;
+    }
+
+    .action-icon:hover {
+        opacity: 0.8;
+    }
+
+   
+    .pagination {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.5rem;
+        margin-top: 1rem;
+    }
+
+    .page-link {
+        padding: 0.5rem 0.75rem;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        text-decoration: none;
+        color: #0066cc;
+        font-size: clamp(0.85rem, 2.2vw, 0.95rem);
+    }
+
+    .page-link:hover {
+        background-color: #f0f0f0;
+    }
+
+    .page-link.active {
+        background-color: #0066cc;
+        color: white;
+        border-color: #0066cc;
+    }
+
+  
+    .btn-primary {
+        padding: 0.75rem 1.5rem;
+        color: white;
+        background-color: #0066cc;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: clamp(0.9rem, 2.5vw, 1rem);
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        text-decoration: none;
+        transition: background-color 0.2s;
+        white-space: nowrap;
+    }
+
+    .btn-primary:hover {
+        background-color: #0052a3;
+    }
+
+   
+    @media (max-width: 768px) {
+        .container {
+            padding: 1rem;
+        }
+
+        .page-header {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .table th, .table td {
+            padding: 0.5rem;
+        }
+
+        .table tr {
+            height: 2.5rem;
+        }
+
+        .btn-primary {
+            width: 100%;
+            justify-content: center;
+        }
+    }
+
+    @media (max-width: 480px) {
+        .page-title {
+            font-size: clamp(1.2rem, 5vw, 1.5rem);
+        }
+
+        .table td {
+            max-width: 150px;
+        }
+
+        .pagination {
+            gap: 0.3rem;
+        }
+
+        .page-link {
+            padding: 0.4rem 0.6rem;
+            font-size: clamp(0.75rem, 2vw, 0.85rem);
+        }
+    }

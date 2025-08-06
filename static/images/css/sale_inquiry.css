@@ -1,0 +1,176 @@
+.container {
+            max-width: 100%;
+            padding: 0 1rem;
+            margin: 0 auto;
+        }
+
+        .table {
+            width: 100%;
+            table-layout: auto;
+            border-collapse: collapse;
+            font-size: 1rem;
+        }
+
+        .table th, .table td {
+            vertical-align: middle;
+            padding: 0.5rem;
+            text-align: left;
+            white-space: normal;
+            word-wrap: break-word;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            justify-content: flex-start;
+        }
+
+        .action-buttons .btn {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.875rem;
+            line-height: 1.2;
+            white-space: nowrap;
+        }
+
+        .d-flex.mb-4 {
+            flex-direction: row;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        h2 {
+            font-size: clamp(1.5rem, 5vw, 1.75rem);
+        }
+
+        .form-label {
+            font-size: 0.9rem;
+        }
+
+        .form-control {
+            font-size: 0.9rem;
+            width: 100%;
+        }
+
+        .form-select {
+            font-size: 0.9rem;
+            width: 100%;
+            padding: 0.5rem 1.5rem 0.5rem 0.5rem; 
+            border-radius: 0.25rem;
+            box-sizing: border-box;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            appearance: none;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") no-repeat right 0.5rem center/1rem 1rem;
+        }
+
+        
+        .form-select option {
+            font-size: 0.9rem;
+            padding: 0.5rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .row.g-3 {
+            row-gap: 1rem;
+        }
+
+        @media (max-width: 992px) {
+            .table th, .table td {
+                font-size: 0.85rem;
+                padding: 0.4rem;
+            }
+
+            .action-buttons {
+                gap: 0.3rem;
+            }
+
+            .action-buttons .btn {
+                padding: 0.2rem 0.4rem;
+                font-size: 0.8rem;
+            }
+
+            .col-md-3 {
+                flex: 0 0 50%;
+                max-width: 50%;
+            }
+
+            .form-select {
+                font-size: 0.85rem;
+                padding: 0.4rem 1.5rem 0.4rem 0.4rem;
+                background-size: 0.9rem 0.9rem;
+            }
+
+            .form-select option {
+                font-size: 0.85rem;
+                padding: 0.4rem;
+            }
+        }
+
+        @media (max-width: 576px) {
+            .table {
+                display: block;
+                overflow-x: auto;
+                white-space: nowrap;
+            }
+
+            .table th, .table td {
+                font-size: 0.75rem;
+                padding: 0.3rem;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.2rem;
+            }
+
+            .action-buttons .btn {
+                width: 100%;
+                text-align: center;
+                padding: 0.3rem;
+                font-size: 0.75rem;
+            }
+
+            .col-md-3 {
+                flex: 0 0 100%; 
+                max-width: 100%;
+            }
+
+            .d-flex.gap-2 {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .d-flex.gap-2 .btn {
+                width: 100%;
+            }
+
+            .d-flex.mb-4 {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            h2 {
+                font-size: clamp(1.25rem, 4vw, 1.5rem);
+            }
+
+            .form-select {
+                font-size: 0.75rem;
+                padding: 0.35rem 1.5rem 0.35rem 0.35rem;
+                background-size: 0.8rem 0.8rem;
+            }
+
+            .form-select option {
+                font-size: 0.75rem;
+                padding: 0.35rem;
+            }
+
+            .form-control {
+                font-size: 0.75rem;
+            }
+        }

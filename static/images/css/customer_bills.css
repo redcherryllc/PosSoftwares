@@ -1,0 +1,88 @@
+.bills-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+    }
+
+    .header-info {
+        margin-bottom: 20px;
+        text-align: center;
+    }
+
+    .messages {
+        margin-bottom: 20px;
+        padding: 10px;
+        border-radius: 4px;
+    }
+
+    .bills-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+    }
+
+    .bills-table th,
+    .bills-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+    }
+
+    .bills-table th {
+        background-color: #f4f4f4;
+        font-weight: bold;
+    }
+
+    .back-link {
+        display: inline-block;
+        margin-top: 20px;
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+    }
+
+    .back-link:hover {
+        background-color: #0056b3;
+    }
+
+    @media screen and (max-width: 768px) {
+        .bills-table {
+            display: block;
+            overflow-x: auto;
+        }
+
+        .bills-table th,
+        .bills-table td {
+            min-width: 120px;
+            font-size: 14px;
+            padding: 8px;
+        }
+
+        .header-info {
+            font-size: 16px;
+        }
+
+        .bills-container {
+            padding: 10px;
+        }
+    }
+
+    @media screen and (max-width: 480px) {
+        .bills-table th,
+        .bills-table td {
+            font-size: 12px;
+            padding: 6px;
+        }
+
+        .header-info {
+            font-size: 14px;
+        }
+
+        .back-link {
+            width: 100%;
+            text-align: center;
+        }
+    }

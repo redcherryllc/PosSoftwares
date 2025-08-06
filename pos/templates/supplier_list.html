@@ -29,41 +29,41 @@
         <div class="card-header">
             <h2><i class="fas fa-user-tie"></i> Suppliers</h2>
         </div>
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Supplier Name</th>
-                    
-                    <th>Phone 1</th>
-                    <th>Email</th>
-                    <th>Address</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for supplier in page_obj %}
+        <div class="table-container">
+            <table class="table">
+                <thead>
                     <tr>
-                        <td>{{ supplier.supplier_name }}</td>
-                       
-                        <td>{{ supplier.phone_1 }}</td>
-                        <td>{{ supplier.email }}</td>
-                        <td>{{ supplier.address }}</td>
-                        <td class="actions">
-                            <a href="{% url 'supplier_edit' supplier.pk %}" class="action-icon" title="Edit Supplier">
-                                <i class="fas fa-edit"></i>
-                            </a>
-                            {% comment %} <a href="{% url 'supplier_delete' supplier.pk %}" class="action-icon text-danger" title="Delete Supplier">
-                                <i class="fas fa-trash"></i>
-                            </a> {% endcomment %}
-                        </td>
+                        <th>Supplier Name</th>
+                        <th>Phone 1</th>
+                        <th>Email</th>
+                        <th>Address</th>
+                        <th>Actions</th>
                     </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="6">No suppliers found.</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    {% for supplier in page_obj %}
+                        <tr>
+                            <td>{{ supplier.supplier_name }}</td>
+                            <td>{{ supplier.phone_1 }}</td>
+                            <td>{{ supplier.email }}</td>
+                            <td>{{ supplier.address }}</td>
+                            <td class="actions">
+                                <a href="{% url 'supplier_edit' supplier.pk %}" class="action-icon" title="Edit Supplier">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                {% comment %} <a href="{% url 'supplier_delete' supplier.pk %}" class="action-icon text-danger" title="Delete Supplier">
+                                    <i class="fas fa-trash"></i>
+                                </a> {% endcomment %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5">No suppliers found.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
 
         {% if page_obj.has_other_pages %}
             <div class="pagination">
@@ -86,123 +86,9 @@
 </div>
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-<style>
-    .container {
-        max-width: 1000px;
-        margin: 0 auto;
-        padding: 30px;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-    .page-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 30px;
-        border-bottom: 2px solid #eaeaea;
-        padding-bottom: 15px;
-    }
-    .page-title {
-        font-size: 28px;
-        color: #333;
-        margin: 0;
-    }
-    .messages {
-        margin-bottom: 25px;
-    }
-    .messages p {
-        padding: 12px 15px;
-        border-radius: 6px;
-        margin: 10px 0;
-    }
-    .messages .error {
-        background-color: #ffebee;
-        color: #c62828;
-        border-left: 4px solid #c62828;
-    }
-    .messages .success {
-        background-color: #e8f5e9;
-        color: #2e7d32;
-        border-left: 4px solid #2e7d32;
-    }
-    .card {
-        background: #ffffff;
-        padding: 30px;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-        margin-bottom: 25px;
-    }
-    .table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 20px;
-    }
-    .table th, .table td {
-        padding: 16px; 
-        text-align: left;
-        border-bottom: 1px solid #eee;
-    }
-    .table tr {
-        height: 60px; 
-    }
-    .table th {
-        background-color: #f8f8f8;
-        font-weight: 600;
-        color: #333;
-    }
-    .actions {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    .action-icon {
-        color: #0066cc;
-        text-decoration: none;
-        font-size: 16px;
-    }
-    .action-icon.text-danger {
-        color: #c62828;
-    }
-    .action-icon:hover {
-        opacity: 0.8;
-    }
-    .pagination {
-        display: flex;
-        justify-content: center;
-        gap: 10px;
-        margin-top: 20px;
-    }
-    .page-link {
-        padding: 8px 12px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        text-decoration: none;
-        color: #0066cc;
-    }
-    .page-link:hover {
-        background-color: #f0f0f0;
-    }
-    .page-link.active {
-        background-color: #0066cc;
-        color: white;
-        border-color: #0066cc;
-    }
-    .btn-primary {
-        padding: 12px 25px;
-        color: white;
-        background-color: #0066cc;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 16px;
-        font-weight: 500;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        text-decoration: none;
-        transition: background-color 0.2s;
-    }
-    .btn-primary:hover {
-        background-color: #0052a3;
-    }
-</style>
+
+<link rel="stylesheet" href="{% static 'images/css/supplier_list.css' %}">
+
+
+
 {% endblock %}

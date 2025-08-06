@@ -1,0 +1,40 @@
+@media print {
+            body * {
+                visibility: hidden;
+            }
+            #purchase-order-table, #purchase-order-table * {
+                visibility: visible;
+            }
+            #purchase-order-table {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            .no-print {
+                display: none;
+            }
+        }
+        .hidden-row {
+            display: none;
+        }
+        .disabled-link {
+            color: #9ca3af;
+            cursor: not-allowed;
+            text-decoration: none;
+        }
+        .disabled-link:hover {
+            text-decoration: none;
+            color: #9ca3af;
+        }
+        
+        @media (max-width: 640px) {
+            #purchase-order-table {
+                display: block;
+                overflow-x: auto;
+                white-space: nowrap;
+            }
+            th, td {
+                min-width: 120px;
+            }
+        }
