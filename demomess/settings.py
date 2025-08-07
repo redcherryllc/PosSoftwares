@@ -38,14 +38,6 @@ DEBUG = True
 
 
 
-import os
-from dotenv import load_dotenv
-load_dotenv()
-
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
-DEBUG = os.getenv("DJANGO_DEBUG") == "True"
-
-
 # Application definition
 
 INSTALLED_APPS = [
