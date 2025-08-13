@@ -31,26 +31,24 @@ SECRET_KEY = 'django-insecure-a7+j7@461#0lznh$(4pr-8$7j6%p+*2(v6)8h%7y_wf%k$p)9+
 # ALLOWED_HOSTS = ['3.87.5.72', 'localhost', '127.0.0.1']
 
 
-# ALLOWED_HOSTS = ['3.87.5.72', 'localhost', '127.0.0.1', 'pos.leniinfotech.in']
+ALLOWED_HOSTS = ['3.87.5.72', 'localhost', '127.0.0.1', 'pos.leniinfotech.in']
 
-# DEBUG = True 
+DEBUG = True 
 
-DEBUG = False
+# DEBUG = False
 
-ALLOWED_HOSTS = ['3.87.5.72', 'pos.leniinfotech.in']
+# ALLOWED_HOSTS = ['3.87.5.72', 'pos.leniinfotech.in']
 
+# SECURE_SSL_REDIRECT = True
+# SESSION_COOKIE_SECURE = True
+# CSRF_COOKIE_SECURE = True
+# SECURE_HSTS_SECONDS = 31536000
+# SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+# SECURE_HSTS_PRELOAD = True
 
-SECURE_SSL_REDIRECT = False
-SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_SECURE = False
-
-SECURE_HSTS_SECONDS = 31536000
-SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-SECURE_HSTS_PRELOAD = True
-
-SECURE_BROWSER_XSS_FILTER = True
-SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = 'DENY'
+# SECURE_BROWSER_XSS_FILTER = True
+# SECURE_CONTENT_TYPE_NOSNIFF = True
+# X_FRAME_OPTIONS = 'DENY'
 
 
 
