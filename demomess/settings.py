@@ -31,11 +31,7 @@ SECRET_KEY = 'django-insecure-a7+j7@461#0lznh$(4pr-8$7j6%p+*2(v6)8h%7y_wf%k$p)9+
 # ALLOWED_HOSTS = ['3.87.5.72', 'localhost', '127.0.0.1']
 
 
-# ALLOWED_HOSTS = ['pos.leniinfotech.in', '3.87.5.72', 'localhost']
-
-
-ALLOWED_HOSTS = ['*']
-
+ALLOWED_HOSTS = ['pos.leniinfotech.in', '3.87.5.72', 'localhost']
 
 DEBUG = True 
 
@@ -154,9 +150,9 @@ USE_TZ = True
 
 
 
-# CSRF_TRUSTED_ORIGINS = [
-#     "https://pos.leniinfotech.in",
-# ]
+CSRF_TRUSTED_ORIGINS = [
+    "https://pos.leniinfotech.in",
+]
 
 
-# SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
