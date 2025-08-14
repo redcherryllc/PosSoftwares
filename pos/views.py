@@ -887,7 +887,15 @@ def save_sale(request):
         return JsonResponse({'success': False, 'error': f"An error occurred: {str(e)}"})
     
 
-
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.db.models import Sum, Count, Q, IntegerField, Value, F
+from django.db.models.functions import Cast, Substr
+from django.shortcuts import render, redirect
+from django.db import transaction
+from django.utils import timezone
+from decimal import Decimal
+import logging
 
 logger = logging.getLogger(__name__)
 
@@ -904,7 +912,14 @@ def calculate_payment_details(sale):
         # Calculate total paid amount
         paid_amount = paid_amount_query.aggregate(total_paid=Sum('debit'))['total_paid'] or Decimal('0.00')
         
-        # Ensure paid_amount does not exceed total_amount
+        # Ensure paid_amount is non-negative and does not exceed total_amount
+        if paid_amount < 0:
+            logger.warning(
+                f"Negative paid_amount detected for Sale {sale.sale_no}: "
+                f"paid_amount={paid_amount:.2f}, setting to 0.00"
+            )
+            paid_amount = Decimal('0.00')
+
         if paid_amount > sale.total_amount:
             logger.warning(
                 f"Overpayment detected for Sale {sale.sale_no}: "
@@ -912,6 +927,7 @@ def calculate_payment_details(sale):
             )
             paid_amount = sale.total_amount
 
+        # Calculate balance
         balance = sale.total_amount - paid_amount
         
         # Ensure balance is non-negative
