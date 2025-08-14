@@ -1,0 +1,319 @@
+ :root {
+            --primary-color: #3a7bd5;
+            --primary-dark: #2d62b0;
+            --secondary-color: #f5f7fa;
+            --text-color: #2c3e50;
+            --text-light: #6c757d;
+            --success-color: #28a745;
+            --error-color: #dc3545;
+            --warning-color: #ffc107;
+            --border-color: #e6e9ed;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+            background-color: var(--secondary-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.6;
+            font-size: 16px;
+        }
+        .container {
+            width: 90%;
+            max-width: 550px;
+            padding: 15px;
+        }
+        h1 {
+            margin-bottom: 25px;
+            font-size: clamp(1.5rem, 5vw, 1.75rem);
+            font-weight: 600;
+            color: var(--text-color);
+            text-align: center;
+            position: relative;
+        }
+        h1:after {
+            content: '';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 3px;
+            background-color: var(--primary-color);
+            border-radius: 2px;
+        }
+        .messages {
+            width: 100%;
+            margin-bottom: 15px;
+        }
+        .messages p {
+            padding: 10px 14px;
+            border-radius: 6px;
+            margin: 6px 0;
+            font-size: clamp(0.85rem, 3vw, 0.9rem);
+            display: flex;
+            align-items: center;
+        }
+        .messages p:before {
+            font-family: "Font Awesome 6 Free";
+            font-weight: 900;
+            margin-right: 8px;
+        }
+        .messages p.error {
+            background-color: #ffeef0;
+            color: var(--error-color);
+            border-left: 4px solid var(--error-color);
+        }
+        .messages p.error:before {
+            content: '\f06a';
+        }
+        .messages p.success {
+            background-color: #ebf9f0;
+            color: var(--success-color);
+            border-left: 4px solid var(--success-color);
+        }
+        .messages p.success:before {
+            content: '\f058';
+        }
+        .messages p.warning {
+            background-color: #fff9e6;
+            color: #9a7d2c;
+            border-left: 4px solid var(--warning-color);
+        }
+        .messages p.warning:before {
+            content: '\f071';
+        }
+        .card {
+            background-color: #fff;
+            padding: clamp(15px, 5vw, 25px);
+            border-radius: 12px;
+            width: 100%;
+            box-shadow: var(--shadow);
+            margin-bottom: 20px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+        }
+        .payment-summary {
+            margin-bottom: 20px;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .payment-summary .header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 12px 15px;
+            font-weight: 600;
+            font-size: clamp(0.9rem, 3vw, 1rem);
+            display: flex;
+            align-items: center;
+        }
+        .payment-summary .header i {
+            margin-right: 8px;
+        }
+        .payment-summary .content {
+            padding: 12px 15px;
+            background-color: white;
+        }
+        .payment-summary .row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: clamp(0.85rem, 3vw, 0.95rem);
+        }
+        .payment-summary .row:last-child {
+            border-bottom: none;
+            padding-top: 12px;
+            margin-top: 5px;
+            border-top: 2px solid #f0f0f0;
+            font-weight: 700;
+            font-size: clamp(1rem, 4vw, 1.1rem);
+        }
+        .payment-summary .label {
+            font-weight: 500;
+            color: var(--text-light);
+        }
+        .payment-summary .value {
+            font-weight: 600;
+            color: var(--text-color);
+        }
+        .payment-summary input[type="number"] {
+            width: 80px;
+            padding: 6px;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-size: clamp(0.85rem, 3vw, 0.95rem);
+            text-align: right;
+        }
+        .payment-summary input.receivable-input {
+            width: 120px;
+            font-weight: 700;
+            font-size: clamp(1.2rem, 4vw, 1.5rem);
+        }
+        form label {
+            font-weight: 500;
+            display: block;
+            margin-bottom: 8px;
+            color: var(--text-color);
+            font-size: clamp(0.9rem, 3vw, 1rem);
+        }
+        form input[type="text"], form textarea {
+            width: 100%;
+            padding: 10px 12px;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            font-size: clamp(0.85rem, 3vw, 0.95rem);
+            background-color: white;
+            color: var(--text-color);
+        }
+        form select {
+            width: 100%;
+            padding: 10px 12px;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            font-size: clamp(0.85rem, 3vw, 0.95rem);
+            background-color: white;
+            color: var(--text-color);
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236c757d' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 14px;
+        }
+        form select:focus, form input:focus, form textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(58, 123, 213, 0.15);
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--primary-color);
+            color: white;
+            font-size: clamp(0.9rem, 3vw, 1rem);
+            font-weight: 600;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        button:hover:not(:disabled) {
+            background-color: var(--primary-dark);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        button:active:not(:disabled) {
+            transform: translateY(1px);
+            box-shadow: none;
+        }
+        button:disabled {
+            background-color: #cbd5e0;
+            cursor: not-allowed;
+        }
+        button i {
+            margin-right: 6px;
+        }
+        a.cancel-link {
+            display: inline-block;
+            margin-top: 5px;
+            color: var(--text-light);
+            font-weight: 500;
+            text-decoration: none;
+            font-size: clamp(0.85rem, 3vw, 0.9rem);
+            transition: color 0.2s ease;
+            text-align: center;
+            width: 100%;
+        }
+        a.cancel-link:hover {
+            color: var(--error-color);
+        }
+        a.cancel-link i {
+            margin-right: 5px;
+        }
+        .secure-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 20px;
+            color: var(--text-light);
+            font-size: clamp(0.85rem, 3vw, 0.9rem);
+        }
+        .secure-badge i {
+            margin-right: 6px;
+            color: var(--success-color);
+        }
+
+     
+        @media (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+            .payment-summary .content {
+                padding: 10px 12px;
+            }
+            .payment-summary .row.sale-bill-row {
+                display: inline-flex;
+                width: 48%;
+                justify-content: space-between;
+                margin-right: 4%;
+                border-bottom: none;
+            }
+            .payment-summary .row.sale-bill-row:last-child {
+                margin-right: 0;
+            }
+            .payment-summary .row.sale-bill-row:nth-child(2) {
+                border-bottom: 1px solid #f0f0f0;
+            }
+            .payment-summary input[type="number"] {
+                width: 60px;
+            }
+            .payment-summary input.receivable-input {
+                width: 100px;
+            }
+            form input[type="text"], form textarea, form select {
+                padding: 8px 10px;
+            }
+            button {
+                padding: 10px;
+            }
+        }
+
+      
+        @media (min-width: 601px) and (max-width: 900px) {
+            .container {
+                width: 85%;
+            }
+            .payment-summary input[type="number"] {
+                width: 90px;
+            }
+            .payment-summary input.receivable-input {
+                width: 110px;
+            }
+        }
+
+       
+        @media (min-width: 901px) {
+            .container {
+                width: 80%;
+            }
+        }
