@@ -153,3 +153,6 @@ USE_TZ = True
 CSRF_TRUSTED_ORIGINS = [
     "https://pos.leniinfotech.in",
 ]
+
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
