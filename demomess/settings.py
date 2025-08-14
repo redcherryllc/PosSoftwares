@@ -147,3 +147,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 TIME_ZONE = 'Asia/Kolkata'
 USE_TZ = True
+
+
+
+CSRF_TRUSTED_ORIGINS = [
+    "https://pos.leniinfotech.in",
+]
