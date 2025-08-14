@@ -942,6 +942,8 @@ def calculate_payment_details(sale):
     except Exception as e:
         logger.error(f"Error calculating payment details for Sale {sale.sale_no}: {str(e)}")
         return Decimal('0.000'), sale.total_amount, []
+    
+    
 
 @login_required
 def process_payment(request):
