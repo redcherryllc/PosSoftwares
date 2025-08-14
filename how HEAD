@@ -1,0 +1,641 @@
+[33mcommit 24fdedf6ee4857186d9dde3df6aa64933ba7e44e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: Anju Rajan <jegan18004@gmail.com>
+Date:   Thu Aug 14 15:56:53 2025 +0530
+
+    save updated files
+
+[1mdiff --git a/pos/views.py b/pos/views.py[m
+[1mindex 1dbc066..a8800af 100644[m
+[1m--- a/pos/views.py[m
+[1m+++ b/pos/views.py[m
+[36m@@ -889,6 +889,630 @@[m [mdef save_sale(request):[m
+ [m
+ [m
+ [m
+[32m+[m[32m#updated code[m[41m [m
+[32m+[m
+[32m+[m[32mlogger = logging.getLogger(__name__)[m
+[32m+[m
+[32m+[m[32mdef calculate_payment_details(sale):[m
+[32m+[m[32m    """Calculate paid_amount and balance for a sale."""[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        # Aggregate debit amounts from JournalEntryLine where debit > 0[m
+[32m+[m[32m        paid_amount_query = JournalEntryLine.objects.filter([m
+[32m+[m[32m            journal_entry__reference=sale.sale_no,[m
+[32m+[m[32m            journal_entry__business_unit=sale.business_unit,[m
+[32m+[m[32m            debit__gt=0[m
+[32m+[m[32m        )[m
+[32m+[m[32m        paid_amount = paid_amount_query.aggregate(total_paid=Sum('debit'))['total_paid'] or Decimal('0.00')[m
+[32m+[m[32m        balance = sale.total_amount - paid_amount[m
+[32m+[m[32m        if balance < 0:[m
+[32m+[m[32m            logger.warning(f"Negative balance detected for Sale {sale.sale_no}: total_amount={sale.total_amount:.2f}, paid_amount={paid_amount:.2f}, balance={balance:.2f}")[m
+[32m+[m[32m            balance = Decimal('0.00')  # Prevent negative balance[m
+[32m+[m
+[32m+[m[32m        payment_details = [[m
+[32m+[m[32m            {[m
+[32m+[m[32m                'journal_entry_id': jel.journal_entry.journal_entry_id,[m
+[32m+[m[32m                'reference': jel.journal_entry.reference,[m
+[32m+[m[32m                'business_unit_id': jel.journal_entry.business_unit.business_unit_id,[m
+[32m+[m[32m                'debit': jel.debit,[m
+[32m+[m[32m                'credit': jel.credit,[m
+[32m+[m[32m                'account_type': jel.account.account_type,[m
+[32m+[m[32m                'account_name': jel.account.account_name,[m
+[32m+[m[32m                'create_remarks': jel.create_remarks[m
+[32m+[m[32m            } for jel in paid_amount_query[m
+[32m+[m[32m        ][m
+[32m+[m
+[32m+[m[32m        all_entries = JournalEntryLine.objects.filter([m
+[32m+[m[32m            journal_entry__reference=sale.sale_no,[m
+[32m+[m[32m            journal_entry__business_unit=sale.business_unit[m
+[32m+[m[32m        ).select_related('journal_entry', 'account')[m
+[32m+[m[32m        all_payment_details = [[m
+[32m+[m[32m            {[m
+[32m+[m[32m                'journal_entry_id': jel.journal_entry.journal_entry_id,[m
+[32m+[m[32m                'reference': jel.journal_entry.reference,[m
+[32m+[m[32m                'business_unit_id': jel.journal_entry.business_unit.business_unit_id,[m
+[32m+[m[32m                'debit': jel.debit,[m
+[32m+[m[32m                'credit': jel.credit,[m
+[32m+[m[32m                'account_type': jel.account.account_type,[m
+[32m+[m[32m                'account_name': jel.account.account_name,[m
+[32m+[m[32m                'create_remarks': jel.create_remarks[m
+[32m+[m[32m            } for jel in all_entries[m
+[32m+[m[32m        ][m
+[32m+[m[32m        logger.debug(f"Calculate Payment - Sale {sale.sale_no}: total_amount={sale.total_amount:.2f}, paid_amount={paid_amount:.2f}, balance={balance:.2f}, payment_details={payment_details}, all_entries={all_payment_details}")[m
+[32m+[m
+[32m+[m[32m        account_types = list(set(jel['account_type'] for jel in all_payment_details))[m
+[32m+[m[32m        logger.debug(f"Calculate Payment - Sale {sale.sale_no}: account_types={account_types}")[m
+[32m+[m
+[32m+[m[32m        return paid_amount, balance, payment_details[m
+[32m+[m[32m    except Exception as e:[m
+[32m+[m[32m        logger.error(f"Error calculating payment details for Sale {sale.sale_no}: {str(e)}")[m
+[32m+[m[32m        return Decimal('0.00'), sale.total_amount, [][m
+[32m+[m
+[32m+[m[32m@login_required[m
+[32m+[m[32mdef process_payment(request):[m
+[32m+[m[32m    saas_user_id = request.session.get('saas_user_id')[m
+[32m+[m[32m    if not saas_user_id:[m
+[32m+[m[32m        logger.warning("No saas_user_id in process_payment")[m
+[32m+[m[32m        messages.error(request, "User not logged in.")[m
+[32m+[m[32m        return redirect('login')[m
+[32m+[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        user = SAASUsers.objects.get(saas_user_id=saas_user_id)[m
+[32m+[m[32m        saas_username = user.saas_username[m
+[32m+[m[32m    except SAASUsers.DoesNotExist:[m
+[32m+[m[32m        logger.error(f"User not found: {saas_user_id}")[m
+[32m+[m[32m        messages.error(request, "User not found.")[m
+[32m+[m[32m        return redirect('login')[m
+[32m+[m
+[32m+[m[32m    sale_id = request.GET.get('sale_id')[m
+[32m+[m[32m    if not sale_id:[m
+[32m+[m[32m        logger.warning("Missing sale_id in process_payment")[m
+[32m+[m[32m        messages.error(request, "Missing sale_id.")[m
+[32m+[m[32m        return redirect('view_order')[m
+[32m+[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        sale = SalesHeader.objects.get(sale_id=sale_id)[m
+[32m+[m[32m        total_amount = sale.total_amount[m
+[32m+[m[32m        business_unit_id = sale.business_unit.business_unit_id[m
+[32m+[m
+[32m+[m[32m        if sale.payment_status not in ['Unpaid', 'Partially Paid']:[m
+[32m+[m[32m            logger.warning(f"Sale already paid: {sale_id}")[m
+[32m+[m[32m            messages.error(request, "This sale has already been paid.")[m
+[32m+[m[32m            return redirect('view_order')[m
+[32m+[m
+[32m+[m[32m        if not sale.business_unit:[m
+[32m+[m[32m            logger.error(f"No business unit for sale: {sale_id}")[m
+[32m+[m[32m            messages.error(request, "Sale has no associated business unit.")[m
+[32m+[m[32m            return redirect('view_order')[m
+[32m+[m
+[32m+[m[32m        paid_amount, balance, payment_details = calculate_payment_details(sale)[m
+[32m+[m
+[32m+[m[32m        logger.debug(f"Process Payment - Sale {sale.sale_no}: total_amount={total_amount:.2f}, paid_amount={paid_amount:.2f}, balance={balance:.2f}, business_unit_id={business_unit_id}, payment_details={payment_details}")[m
+[32m+[m
+[32m+[m[32m        payment_accounts = Category.objects.filter([m
+[32m+[m[32m            category_type='PAYMENT_TYPE',[m
+[32m+[m[32m            business_unit_id=business_unit_id[m
+[32m+[m[32m        ).values('category_id', 'category_name', 'category_value')[m
+[32m+[m
+[32m+[m[32m        if not payment_accounts:[m
+[32m+[m[32m            logger.warning(f"No payment accounts for business unit: {sale.business_unit}")[m
+[32m+[m[32m            messages.warning(request, "No payment methods available. Please contact the administrator.")[m
+[32m+[m
+[32m+[m[32m        context = {[m
+[32m+[m[32m            'sale': sale,[m
+[32m+[m[32m            'total_amount': total_amount,[m
+[32m+[m[32m            'balance': balance,[m
+[32m+[m[32m            'paid_amount': paid_amount,[m
+[32m+[m[32m            'payment_accounts': payment_accounts,[m
+[32m+[m[32m            'username': saas_username,[m
+[32m+[m[32m        }[m
+[32m+[m[32m        logger.debug(f"Process Payment - Sale {sale.sale_no}: Context sent to payment.html: total_amount={total_amount:.2f}, balance={balance:.2f}, paid_amount={paid_amount:.2f}, sale_no={sale.sale_no}, payment_accounts={list(context['payment_accounts'])}")[m
+[32m+[m[32m        return render(request, 'payment.html', context)[m
+[32m+[m[32m    except SalesHeader.DoesNotExist:[m
+[32m+[m[32m        logger.error(f"Sale not found: {sale_id}")[m
+[32m+[m[32m        messages.error(request, "Sale not found.")[m
+[32m+[m[32m        return redirect('view_order')[m
+[32m+[m[32m    except Exception as e:[m
+[32m+[m[32m        logger.error(f"Error in process_payment: {str(e)}")[m
+[32m+[m[32m        messages.error(request, f"Error processing payment: {str(e)}")[m
+[32m+[m[32m        return redirect('view_order')[m
+[32m+[m
+[32m+[m[32m@login_required[m
+[32m+[m[32m@transaction.atomic[m
+[32m+[m[32m@require_POST[m
+[32m+[m[32mdef confirm_payment(request):[m
+[32m+[m[32m    saas_user_id = request.session.get('saas_user_id')[m
+[32m+[m[32m    if not saas_user_id:[m
+[32m+[m[32m        logger.warning("No saas_user_id in confirm_payment")[m
+[32m+[m[32m        messages.error(request, "User not logged in.")[m
+[32m+[m[32m        return redirect('login')[m
+[32m+[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        user = SAASUsers.objects.get(saas_user_id=saas_user_id)[m
+[32m+[m[32m        saas_username = user.saas_username[m
+[32m+[m[32m    except SAASUsers.DoesNotExist:[m
+[32m+[m[32m        logger.error(f"User not found: {saas_user_id}")[m
+[32m+[m[32m        messages.error(request, "User not found.")[m
+[32m+[m[32m        return redirect('login')[m
+[32m+[m
+[32m+[m[32m    sale_id = request.POST.get('sale_id')[m
+[32m+[m[32m    total_amount = request.POST.get('total_amount')[m
+[32m+[m[32m    net_amount = request.POST.get('net_amount')[m
+[32m+[m[32m    payment_method_id = request.POST.get('payment_method')[m
+[32m+[m[32m    card_no = request.POST.get('card_no', '')[m
+[32m+[m[32m    remarks = request.POST.get('remarks', '')[m
+[32m+[m
+[32m+[m[32m    logger.debug(f"Confirm Payment - Received POST data: sale_id={sale_id}, total_amount={total_amount}, net_amount={net_amount}, payment_method_id={payment_method_id}, card_no='{card_no}', remarks='{remarks}'")[m
+[32m+[m
+[32m+[m[32m    if not all([sale_id, total_amount, net_amount, payment_method_id]):[m
+[32m+[m[32m        missing = [][m
+[32m+[m[32m        if not sale_id:[m
+[32m+[m[32m            missing.append("sale_id")[m
+[32m+[m[32m        if not total_amount:[m
+[32m+[m[32m            missing.append("total_amount")[m
+[32m+[m[32m        if not net_amount:[m
+[32m+[m[32m            missing.append("net_amount")[m
+[32m+[m[32m        if not payment_method_id:[m
+[32m+[m[32m            missing.append("payment_method")[m
+[32m+[m[32m        logger.warning(f"Missing fields in confirm_payment: {missing}")[m
+[32m+[m[32m        messages.error(request, f"Missing required fields: {', '.join(missing)}.")[m
+[32m+[m[32m        return redirect('process_payment')[m
+[32m+[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        sale = SalesHeader.objects.get(sale_id=sale_id)[m
+[32m+[m[32m        total_amount = Decimal(total_amount)[m
+[32m+[m[32m        net_amount = Decimal(net_amount)[m
+[32m+[m
+[32m+[m[32m        paid_amount, current_balance, payment_details = calculate_payment_details(sale)[m
+[32m+[m
+[32m+[m[32m        logger.debug(f"Confirm Payment - Sale {sale.sale_no}: total_amount={total_amount:.2f}, paid_amount={paid_amount:.2f}, current_balance={current_balance:.2f}, net_amount={net_amount:.2f}, business_unit_id={sale.business_unit.business_unit_id}, payment_details={payment_details}")[m
+[32m+[m
+[32m+[m[32m        if net_amount <= 0:[m
+[32m+[m[32m            logger.warning(f"Invalid net_amount: {net_amount}")[m
+[32m+[m[32m            messages.error(request, "Payment amount must be greater than zero.")[m
+[32m+[m[32m            return redirect('process_payment')[m
+[32m+[m
+[32m+[m[32m        if net_amount > current_balance:[m
+[32m+[m[32m            logger.warning(f"Net amount {net_amount} exceeds balance {current_balance}")[m
+[32m+[m[32m            messages.error(request, "Payment amount cannot exceed remaining balance.")[m
+[32m+[m[32m            return redirect('process_payment')[m
+[32m+[m
+[32m+[m[32m        if sale.payment_status == 'Paid':[m
+[32m+[m[32m            logger.warning(f"Sale already paid: {sale_id}")[m
+[32m+[m[32m            messages.error(request, "This sale has already been paid.")[m
+[32m+[m[32m            return redirect('process_payment')[m
+[32m+[m
+[32m+[m[32m        if not sale.business_unit:[m
+[32m+[m[32m            logger.error(f"No business unit for sale: {sale_id}")[m
+[32m+[m[32m            messages.error(request, "Sale has no associated business unit.")[m
+[32m+[m[32m            return redirect('process_payment')[m
+[32m+[m
+[32m+[m[32m        def get_account(account_type, account_code, account_name):[m
+[32m+[m[32m            try:[m
+[32m+[m[32m                account = ChartOfAccounts.objects.get([m
+[32m+[m[32m                    business_unit=sale.business_unit,[m
+[32m+[m[32m                    account_code=account_code[m
+[32m+[m[32m                )[m
+[32m+[m[32m                if account.account_type != account_type or account.account_name != account_name:[m
+[32m+[m[32m                    raise ValueError([m
+[32m+[m[32m                        f"Account mismatch: '{account_code}' exists but has type='{account.account_type}' "[m
+[32m+[m[32m                        f"and name='{account.account_name}' (expected type='{account_type}', name='{account_name}')"[m
+[32m+[m[32m                    )[m
+[32m+[m[32m                return account[m
+[32m+[m[32m            except ChartOfAccounts.DoesNotExist:[m
+[32m+[m[32m                raise ValueError(f"Required account not found: {account_name} ({account_code}) for business unit {sale.business_unit}")[m
+[32m+[m
+[32m+[m[32m        try:[m
+[32m+[m[32m            payment_category = Category.objects.get([m
+[32m+[m[32m                category_id=payment_method_id,[m
+[32m+[m[32m                category_type='PAYMENT_TYPE',[m
+[32m+[m[32m                business_unit_id=sale.business_unit.business_unit_id[m
+[32m+[m[32m            )[m
+[32m+[m[32m            account_name = payment_category.category_name.upper()[m
+[32m+[m[32m            payment_account = ChartOfAccounts.objects.get([m
+[32m+[m[32m                account_name=account_name,[m
+[32m+[m[32m                business_unit=sale.business_unit[m
+[32m+[m[32m            )[m
+[32m+[m[32m        except Category.DoesNotExist:[m
+[32m+[m[32m            logger.error(f"Invalid payment method category: {payment_method_id}")[m
+[32m+[m[32m            messages.error(request, "Invalid payment method selected.")[m
+[32m+[m[32m            return redirect('process_payment')[m
+[32m+[m[32m        except ChartOfAccounts.DoesNotExist:[m
+[32m+[m[32m            logger.error(f"No ChartOfAccounts entry for payment method: {account_name}")[m
+[32m+[m[32m            messages.error(request, f"No account found for payment method: {account_name}.")[m
+[32m+[m[32m            return redirect('process_payment')[m
+[32m+[m
+[32m+[m[32m        sales_account = get_account('Revenue', 'REV_001', 'Sales Revenue')[m
+[32m+[m[32m        tax_account = get_account('Liability', 'LIAB_001', 'Tax Payable')[m
+[32m+[m
+[32m+[m[32m        current_date = timezone.now().date()[m
+[32m+[m[32m        current_time = timezone.now()[m
+[32m+[m
+[32m+[m[32m        new_paid_amount = paid_amount + net_amount[m
+[32m+[m[32m        payment_status = 'Partially Paid' if new_paid_amount < sale.total_amount else 'Paid'[m
+[32m+[m
+[32m+[m[32m        tax_rate = Decimal('0.10')[m
+[32m+[m[32m        tax_amount = net_amount * tax_rate / (1 + tax_rate)[m
+[32m+[m[32m        revenue_amount = net_amount - tax_amount[m
+[32m+[m
+[32m+[m[32m        payment_remarks = f"{'Partial ' if payment_status == 'Partially Paid' else ''}Payment received for Sale No: {sale.sale_no}"[m
+[32m+[m[32m        update_marks = f"{'Partial ' if payment_status == 'Partially Paid' else ''}Payment of {net_amount:.2f} processed on {current_date}"[m
+[32m+[m[32m        if card_no or remarks:[m
+[32m+[m[32m            payment_remarks += f"; Card No: {card_no or 'N/A'}; Remarks: {remarks or 'None'}"[m
+[32m+[m[32m            update_marks += f"; Card No: {card_no or 'N/A'}; Remarks: {remarks or 'None'}"[m
+[32m+[m
+[32m+[m[32m        logger.debug(f"Confirm Payment - Sale {sale.sale_no}: payment_remarks='{payment_remarks}', update_marks='{update_marks}'")[m
+[32m+[m
+[32m+[m[32m        sale.payment_method = payment_category.category_name[m
+[32m+[m[32m        sale.payment_status = payment_status[m
+[32m+[m[32m        sale.update_dt = current_date[m
+[32m+[m[32m        sale.update_tm = current_time[m
+[32m+[m[32m        sale.update_by = saas_username[m
+[32m+[m[32m        sale.update_marks = update_marks[m
+[32m+[m[32m        sale.save(update_fields=['payment_method', 'payment_status', 'update_dt', 'update_tm', 'update_by', 'update_marks'])[m
+[32m+[m
+[32m+[m[32m        journal_entry = JournalEntries.objects.create([m
+[32m+[m[32m            business_unit=sale.business_unit,[m
+[32m+[m[32m            journal_entry_date=current_date,[m
+[32m+[m[32m            description=f"{'Partial ' if payment_status == 'Partially Paid' else ''}Payment for Sale No: {sale.sale_no}",[m
+[32m+[m[32m            card_no=card_no or '',[m
+[32m+[m[32m            remarks=remarks or '',[m
+[32m+[m[32m            reference=sale.sale_no,[m
+[32m+[m[32m            create_dt=current_date,[m
+[32m+[m[32m            create_tm=current_time,[m
+[32m+[m[32m            create_by=saas_username,[m
+[32m+[m[32m            create_remarks=payment_remarks,[m
+[32m+[m[32m            update_dt=current_date,[m
+[32m+[m[32m            update_tm=current_time,[m
+[32m+[m[32m            update_by='',[m
+[32m+[m[32m            update_marks=''[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m[32m        payment_line = JournalEntryLine.objects.create([m
+[32m+[m[32m            business_unit=sale.business_unit,[m
+[32m+[m[32m            journal_entry=journal_entry,[m
+[32m+[m[32m            account=payment_account,[m
+[32m+[m[32m            debit=net_amount,[m
+[32m+[m[32m            credit=Decimal('0.00'),[m
+[32m+[m[32m            create_dt=current_date,[m
+[32m+[m[32m            create_tm=current_time,[m
+[32m+[m[32m            create_by=saas_username,[m
+[32m+[m[32m            create_remarks=payment_remarks,[m
+[32m+[m[32m            update_dt=current_date,[m
+[32m+[m[32m            update_tm=current_time,[m
+[32m+[m[32m            update_by='',[m
+[32m+[m[32m            update_marks=''[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m[32m        JournalEntryLine.objects.create([m
+[32m+[m[32m            business_unit=sale.business_unit,[m
+[32m+[m[32m            journal_entry=journal_entry,[m
+[32m+[m[32m            account=sales_account,[m
+[32m+[m[32m            debit=Decimal('0.00'),[m
+[32m+[m[32m            credit=revenue_amount,[m
+[32m+[m[32m            create_dt=current_date,[m
+[32m+[m[32m            create_tm=current_time,[m
+[32m+[m[32m            create_by=saas_username,[m
+[32m+[m[32m            create_remarks=f"Sales revenue for Sale No: {sale.sale_no}",[m
+[32m+[m[32m            update_dt=current_date,[m
+[32m+[m[32m            update_tm=current_time,[m
+[32m+[m[32m            update_by='',[m
+[32m+[m[32m            update_marks=''[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m[32m        JournalEntryLine.objects.create([m
+[32m+[m[32m            business_unit=sale.business_unit,[m
+[32m+[m[32m            journal_entry=journal_entry,[m
+[32m+[m[32m            account=tax_account,[m
+[32m+[m[32m            debit=Decimal('0.00'),[m
+[32m+[m[32m            credit=tax_amount,[m
+[32m+[m[32m            create_dt=current_date,[m
+[32m+[m[32m            create_tm=current_time,[m
+[32m+[m[32m            create_by=saas_username,[m
+[32m+[m[32m            create_remarks=f"Tax payable for Sale No: {sale.sale_no}",[m
+[32m+[m[32m            update_dt=current_date,[m
+[32m+[m[32m            update_tm=current_time,[m
+[32m+[m[32m            update_by='',[m
+[32m+[m[32m            update_marks=''[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m[32m        for account, amount, remark in [[m
+[32m+[m[32m            (payment_account, net_amount, f"{'Partial ' if payment_status == 'Partially Paid' else ''}Payment of Sale No: {sale.sale_no}"),[m
+[32m+[m[32m            (sales_account, -revenue_amount, f"Revenue of Sale No: {sale.sale_no}"),[m
+[32m+[m[32m            (tax_account, -tax_amount, f"Tax payable of Sale No: {sale.sale_no}")[m
+[32m+[m[32m        ]:[m
+[32m+[m[32m            if amount != 0:[m
+[32m+[m[32m                account.account_balance += amount[m
+[32m+[m[32m                account.update_dt = current_date[m
+[32m+[m[32m                account.update_tm = current_time[m
+[32m+[m[32m                account.update_by = saas_username[m
+[32m+[m[32m                account.update_marks = f"Updated balance for {remark}"[m
+[32m+[m[32m                account.save(update_fields=['account_balance', 'update_dt', 'update_tm', 'update_by', 'update_marks'])[m
+[32m+[m
+[32m+[m[32m        saved_payment = JournalEntryLine.objects.filter([m
+[32m+[m[32m            journal_entry__reference=sale.sale_no,[m
+[32m+[m[32m            journal_entry__business_unit=sale.business_unit,[m
+[32m+[m[32m            debit=net_amount,[m
+[32m+[m[32m            create_remarks=payment_remarks[m
+[32m+[m[32m        ).first()[m
+[32m+[m[32m        if saved_payment:[m
+[32m+[m[32m            logger.debug(f"Confirm Payment - Sale {sale.sale_no}: Payment saved successfully, journal_entry_line_id={saved_payment.journal_entry_line_id}, create_remarks='{saved_payment.create_remarks}'")[m
+[32m+[m[32m        else:[m
+[32m+[m[32m            logger.error(f"Confirm Payment - Sale {sale.sale_no}: Failed to verify saved payment for {net_amount:.2f}, payment_remarks='{payment_remarks}'")[m
+[32m+[m[32m            messages.error(request, f"Payment processing issue for Sale No: {sale.sale_no}. Please try again.")[m
+[32m+[m[32m            return redirect('process_payment')[m
+[32m+[m
+[32m+[m[32m        logger.debug(f"Confirm Payment - Sale {sale.sale_no}: Payment of {net_amount:.2f}, new_paid_amount={new_paid_amount:.2f}, payment_status={payment_status}, tax_amount={tax_amount:.2f}, revenue_amount={revenue_amount:.2f}")[m
+[32m+[m
+[32m+[m[32m        messages.success(request, f"{'Partial ' if payment_status == 'Partially Paid' else ''}Payment of {net_amount:.2f} for Sale No: {sale.sale_no} processed successfully.")[m
+[32m+[m[32m        return redirect('view_order')[m
+[32m+[m[32m    except SalesHeader.DoesNotExist:[m
+[32m+[m[32m        logger.error(f"Sale not found: {sale_id}")[m
+[32m+[m[32m        messages.error(request, "Sale not found.")[m
+[32m+[m[32m        return redirect('process_payment')[m
+[32m+[m[32m    except ValueError as e:[m
+[32m+[m[32m        logger.error(f"Account error in confirm_payment: {str(e)}")[m
+[32m+[m[32m        messages.error(request, f"Account error: {str(e)}")[m
+[32m+[m[32m        return redirect('process_payment')[m
+[32m+[m[32m    except Exception as e:[m
+[32m+[m[32m        logger.error(f"Error in confirm_payment: {str(e)}")[m
+[32m+[m[32m        messages.error(request, f"Error confirming payment: {str(e)}")[m
+[32m+[m[32m        return redirect('process_payment')[m
+[32m+[m
+[32m+[m[32m@login_required[m
+[32m+[m[32mdef payment_view(request):[m
+[32m+[m[32m    saas_user_id = request.session.get('saas_user_id')[m
+[32m+[m[32m    if not saas_user_id:[m
+[32m+[m[32m        logger.warning("No saas_user_id in payment_view")[m
+[32m+[m[32m        return redirect('login')[m
+[32m+[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        user = SAASUsers.objects.get(saas_user_id=saas_user_id)[m
+[32m+[m[32m        saas_username = user.saas_username[m
+[32m+[m[41m        [m
+[32m+[m[32m        sale_id = request.GET.get('sale_id')[m
+[32m+[m[32m        sale = SalesHeader.objects.get(sale_id=sale_id)[m[41m       [m
+[32m+[m
+[32m+[m[32m        business_unit_id = sale.business_unit.business_unit_id[m
+[32m+[m
+[32m+[m[32m        payment_accounts = Category.objects.filter([m
+[32m+[m[32m            category_type='PAYMENT_TYPE',[m
+[32m+[m[32m            business_unit_id=business_unit_id[m
+[32m+[m[32m        ).values('category_id', 'category_name', 'category_value')[m
+[32m+[m
+[32m+[m[32m        paid_amount, balance, _ = calculate_payment_details(sale)[m
+[32m+[m
+[32m+[m[32m        context = {[m
+[32m+[m[32m            'sale': sale,[m
+[32m+[m[32m            'sale_total': sale.total_amount,[m
+[32m+[m[32m            'sale_id': sale_id,[m
+[32m+[m[32m            'username': saas_username,[m
+[32m+[m[32m            'payment_accounts': payment_accounts,[m
+[32m+[m[32m            'paid_amount': paid_amount,[m
+[32m+[m[32m            'balance': balance,[m
+[32m+[m[32m        }[m
+[32m+[m[32m        return render(request, 'payment.html', context)[m
+[32m+[m[32m    except SalesHeader.DoesNotExist:[m
+[32m+[m[32m        logger.error(f"Sale not found: {sale_id}")[m
+[32m+[m[32m        return redirect('home')[m
+[32m+[m[32m    except SAASUsers.DoesNotExist:[m
+[32m+[m[32m        logger.error(f"User not found: {saas_user_id}")[m
+[32m+[m[32m        return redirect('login')[m
+[32m+[m[32m    except Exception as e:[m
+[32m+[m[32m        logger.error(f"Error in payment_view: {str(e)}")[m
+[32m+[m[32m        messages.error(request, f"Error loading payment view: {str(e)}")[m
+[32m+[m[32m        return redirect('home')[m
+[32m+[m
+[32m+[m[32m@login_required[m
+[32m+[m[32mdef view_order(request):[m
+[32m+[m[32m    business_unit_id = request.session.get('business_unit_id')[m
+[32m+[m[32m    if not business_unit_id:[m
+[32m+[m[32m        logger.warning("No business_unit_id in session")[m
+[32m+[m[32m        messages.error(request, "Business unit not found. Please log in again.")[m
+[32m+[m[32m        return redirect('home')[m
+[32m+[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        today = timezone.now().date()[m
+[32m+[m
+[32m+[m[32m        unpaid_sales = SalesHeader.objects.filter([m
+[32m+[m[32m            business_unit_id=business_unit_id,[m
+[32m+[m[32m            payment_status__in=['Unpaid', 'Partially Paid'][m
+[32m+[m[32m        ).filter([m
+[32m+[m[32m            Q(payment_status='Unpaid', sale_date=today) |[m
+[32m+[m[32m            Q(payment_status='Partially Paid', update_dt=today)[m
+[32m+[m[32m        ).select_related('customer', 'business_unit', 'branch', 'table', 'room', 'vehicle')\[m
+[32m+[m[32m         .annotate(total_items=Count('salesline'))\[m
+[32m+[m[32m         .annotate([m
+[32m+[m[32m            status_priority=Case([m
+[32m+[m[32m                When(payment_status='Unpaid', then=Value(1)),[m
+[32m+[m[32m                When(payment_status='Partially Paid', then=Value(2)),[m
+[32m+[m[32m                output_field=IntegerField(),[m
+[32m+[m[32m            )[m
+[32m+[m[32m        ).order_by('-sale_no', 'status_priority', F('update_dt').desc(nulls_last=True), '-sale_date')[m
+[32m+[m
+[32m+[m[32m        sales_data = [][m
+[32m+[m[32m        updated_sale_nos = [][m
+[32m+[m
+[32m+[m[32m        for sale in unpaid_sales:[m
+[32m+[m[32m            paid_amount, balance, payment_details = calculate_payment_details(sale)[m
+[32m+[m
+[32m+[m[32m            new_payment_status = 'Unpaid'[m
+[32m+[m[32m            if paid_amount > 0:[m
+[32m+[m[32m                new_payment_status = 'Partially Paid' if balance > 0 else 'Paid'[m
+[32m+[m[32m                if sale.payment_status != new_payment_status and new_payment_status != 'Paid':[m
+[32m+[m[32m                    sale.payment_status = new_payment_status[m
+[32m+[m[32m                    sale.update_dt = today[m
+[32m+[m[32m                    sale.update_tm = timezone.now()[m
+[32m+[m[32m                    sale.update_marks = f"Payment status updated to {new_payment_status} on {sale.update_dt}"[m
+[32m+[m[32m                    sale.save(update_fields=['payment_status', 'update_dt', 'update_tm', 'update_marks'])[m
+[32m+[m[32m                    sale.is_updated = new_payment_status == 'Partially Paid'[m
+[32m+[m[32m                    if sale.is_updated:[m
+[32m+[m[32m                        updated_sale_nos.append(sale.sale_no)[m
+[32m+[m[32m                else:[m
+[32m+[m[32m                    sale.is_updated = False[m
+[32m+[m[32m            else:[m
+[32m+[m[32m                sale.is_updated = False[m
+[32m+[m
+[32m+[m[32m            sale.paid_amount = paid_amount[m
+[32m+[m[32m            sale.balance = balance[m
+[32m+[m
+[32m+[m[32m            logger.debug(f"View Order - Sale {sale.sale_no}: total_amount={sale.total_amount:.2f}, paid_amount={paid_amount:.2f}, balance={balance:.2f}, business_unit_id={sale.business_unit.business_unit_id}, update_dt={sale.update_dt}, sale_date={sale.sale_date}, update_marks={sale.update_marks}, payment_details={payment_details}")[m
+[32m+[m
+[32m+[m[32m            sales_data.append({[m
+[32m+[m[32m                'sale_no': sale.sale_no,[m
+[32m+[m[32m                'total_amount': float(sale.total_amount),[m
+[32m+[m[32m                'paid_amount': float(sale.paid_amount),[m
+[32m+[m[32m                'balance': float(sale.balance),[m
+[32m+[m[32m                'payment_status': sale.payment_status,[m
+[32m+[m[32m                'update_dt': sale.update_dt,[m
+[32m+[m[32m                'sale_date': sale.sale_date[m
+[32m+[m[32m            })[m
+[32m+[m
+[32m+[m[32m        context = {[m
+[32m+[m[32m            'unpaid_sales': unpaid_sales,[m
+[32m+[m[32m        }[m
+[32m+[m[32m        logger.debug(f"View Order: Context sent to view_order.html: unpaid_sales={sales_data}, updated_sale_nos={updated_sale_nos}")[m
+[32m+[m[32m        return render(request, 'view_order.html', context)[m
+[32m+[m
+[32m+[m[32m    except Exception as e:[m
+[32m+[m[32m        logger.error(f"Error in view_order: {str(e)}")[m
+[32m+[m[32m        messages.error(request, f"Error: {str(e)}")[m
+[32m+[m[32m        return redirect('home')[m
+[32m+[m
+[32m+[m[32m@login_required[m
+[32m+[m[32mdef sale_inquiry(request):[m
+[32m+[m[32m    business_unit_id = request.session.get('business_unit_id')[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        start_date = request.GET.get('start_date')[m
+[32m+[m[32m        end_date = request.GET.get('end_date')[m
+[32m+[m[32m        payment_status = request.GET.getlist('payment_status')[m
+[32m+[m
+[32m+[m[32m        unpaid_sales = SalesHeader.objects.filter([m
+[32m+[m[32m            business_unit_id=business_unit_id,[m
+[32m+[m[32m            payment_status__in=['Unpaid', 'Partially Paid', 'Paid'][m
+[32m+[m[32m        ).select_related('customer', 'business_unit', 'branch', 'table', 'room', 'vehicle')\[m
+[32m+[m[32m         .annotate(total_items=Count('salesline'))\[m
+[32m+[m[32m         .annotate([m
+[32m+[m[32m             sale_no_numeric=Cast([m
+[32m+[m[32m                 Substr('sale_no', 6),[m
+[32m+[m[32m                 output_field=IntegerField()[m
+[32m+[m[32m             )[m
+[32m+[m[32m         ).order_by('-sale_no_numeric')[m
+[32m+[m
+[32m+[m[32m        if payment_status:[m
+[32m+[m[32m            unpaid_sales = unpaid_sales.filter(payment_status__in=payment_status)[m
+[32m+[m
+[32m+[m[32m        if start_date:[m
+[32m+[m[32m            start_date = parse_date(start_date)[m
+[32m+[m[32m            if start_date:[m
+[32m+[m[32m                unpaid_sales = unpaid_sales.filter([m
+[32m+[m[32m                    Q(payment_status='Partially Paid', update_dt__gte=start_date) |[m
+[32m+[m[32m                    Q(payment_status__in=['Unpaid', 'Paid'], sale_date__gte=start_date)[m
+[32m+[m[32m                )[m
+[32m+[m[32m        if end_date:[m
+[32m+[m[32m            end_date = parse_date(end_date)[m
+[32m+[m[32m            if end_date:[m
+[32m+[m[32m                unpaid_sales = unpaid_sales.filter([m
+[32m+[m[32m                    Q(payment_status='Partially Paid', update_dt__lte=end_date) |[m
+[32m+[m[32m                    Q(payment_status__in=['Unpaid', 'Paid'], sale_date__lte=end_date)[m
+[32m+[m[32m                )[m
+[32m+[m
+[32m+[m[32m        sales_data = [][m
+[32m+[m[32m        updated_sale_nos = [][m
+[32m+[m[32m        for sale in unpaid_sales:[m
+[32m+[m[32m            paid_amount, balance, payment_details = calculate_payment_details(sale)[m
+[32m+[m
+[32m+[m[32m            new_payment_status = 'Unpaid'[m
+[32m+[m[32m            if paid_amount > 0:[m
+[32m+[m[32m                new_payment_status = 'Partially Paid' if balance > 0 else 'Paid'[m
+[32m+[m[32m                if sale.payment_status != new_payment_status and new_payment_status != 'Paid':[m
+[32m+[m[32m                    sale.payment_status = new_payment_status[m
+[32m+[m[32m                    sale.update_dt = timezone.now().date()[m
+[32m+[m[32m                    sale.update_tm = timezone.now()[m
+[32m+[m[32m                    sale.update_marks = f"Payment status updated to {new_payment_status} on {sale.update_dt}"[m
+[32m+[m[32m                    sale.save(update_fields=['payment_status', 'update_dt', 'update_tm', 'update_marks'])[m
+[32m+[m[32m                    if new_payment_status == 'Partially Paid':[m
+[32m+[m[32m                        updated_sale_nos.append(sale.sale_no)[m
+[32m+[m[32m                        sale.is_updated = True[m
+[32m+[m[32m                    else:[m
+[32m+[m[32m                        sale.is_updated = False[m
+[32m+[m[32m                else:[m
+[32m+[m[32m                    sale.is_updated = False[m
+[32m+[m[32m            else:[m
+[32m+[m[32m                sale.is_updated = False[m
+[32m+[m
+[32m+[m[32m            sale.paid_amount = paid_amount[m
+[32m+[m[32m            sale.balance = balance[m
+[32m+[m
+[32m+[m[32m            logger.debug([m
+[32m+[m[32m                f"sale_inquiry - Sale {sale.sale_no}: "[m
+[32m+[m[32m                f"total_amount={sale.total_amount:.2f}, paid_amount={paid_amount:.2f}, "[m
+[32m+[m[32m                f"balance={balance:.2f}, business_unit_id={sale.business_unit.business_unit_id}, "[m
+[32m+[m[32m                f"update_dt={sale.update_dt}, update_marks={sale.update_marks}, "[m
+[32m+[m[32m                f"payment_details={payment_details}"[m
+[32m+[m[32m            )[m
+[32m+[m
+[32m+[m[32m            sales_data.append({[m
+[32m+[m[32m                'sale_no': sale.sale_no,[m
+[32m+[m[32m                'total_amount': float(sale.total_amount),[m
+[32m+[m[32m                'paid_amount': float(sale.paid_amount),[m
+[32m+[m[32m                'balance': float(sale.balance),[m
+[32m+[m[32m                'payment_status': sale.payment_status,[m
+[32m+[m[32m                'update_dt': sale.update_dt[m
+[32m+[m[32m            })[m
+[32m+[m
+[32m+[m[32m        context = {[m
+[32m+[m[32m            'unpaid_sales': unpaid_sales,[m
+[32m+[m[32m            'start_date': start_date,[m
+[32m+[m[32m            'end_date': end_date,[m
+[32m+[m[32m            'payment_status': payment_status,[m
+[32m+[m[32m        }[m
+[32m+[m[32m        logger.debug([m
+[32m+[m[32m            f"sale_inquiry: Context sent to sale_inquiry.html: "[m
+[32m+[m[32m            f"unpaid_sales={sales_data}, updated_sale_nos={updated_sale_nos}, "[m
+[32m+[m[32m            f"payment_status={payment_status}"[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m[32m        return render(request, 'sale_inquiry.html', context)[m
+[32m+[m
+[32m+[m[32m    except Exception as e:[m
+[32m+[m[32m        logger.error(f"Error in sale_inquiry: {str(e)}")[m
+[32m+[m[32m        messages.error(request, f"Error: {str(e)}")[m
+[32m+[m[32m        return redirect('home')[m
+[32m+[m
+[32m+[m[32m@login_required[m
+[32m+[m[32mdef sale_detail(request, sale_id):[m
+[32m+[m[32m    try:[m
+[32m+[m[32m        sale = SalesHeader.objects.select_related([m
+[32m+[m[32m            'customer', 'business_unit', 'branch', 'table', 'room', 'vehicle'[m
+[32m+[m[32m        ).get(sale_id=sale_id, business_unit_id=request.session.get('business_unit_id'))[m
+[32m+[m
+[32m+[m[32m        sale_lines = SalesLine.objects.select_related('product').filter(sale_id=sale_id)[m
+[32m+[m
+[32m+[m[32m        paid_amount, balance, payment_details = calculate_payment_details(sale)[m
+[32m+[m[32m        sale.paid_amount = paid_amount[m
+[32m+[m[32m        sale.balance = balance[m
+[32m+[m
+[32m+[m[32m        context = {[m
+[32m+[m[32m            'sale': sale,[m
+[32m+[m[32m            'sale_lines': sale_lines,[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        logger.debug([m
+[32m+[m[32m            f"sale_detail - Sale {sale.sale_no}: "[m
+[32m+[m[32m            f"total_amount={sale.total_amount:.2f}, paid_amount={paid_amount:.2f}, "[m
+[32m+[m[32m            f"balance={balance:.2f}, items_count={sale_lines.count()}"[m
+[32m+[m[32m        )[m
+[32m+[m
+[32m+[m[32m        return render(request, 'sale_detail.html', context)[m
+[32m+[m
+[32m+[m[32m    except SalesHeader.DoesNotExist:[m
+[32m+[m[32m        logger.error(f"Sale with ID {sale_id} not found or unauthorized access.")[m
+[32m+[m[32m        messages.error(request, "Sale not found or you do not have access.")[m
+[32m+[m[32m        return redirect('sale_inquiry')[m
+[32m+[m[32m    except Exception as e:[m
+[32m+[m[32m        logger.error(f"Error in sale_detail: {str(e)}")[m
+[32m+[m[32m        messages.error(request, f"Error: {str(e)}")[m
+[32m+[m[32m        return redirect('sale_inquiry')[m
+ [m
+ logger = logging.getLogger(__name__)[m
+ [m
