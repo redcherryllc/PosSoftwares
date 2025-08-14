@@ -662,7 +662,7 @@ class StockAdjustment(models.Model):
     createtm = models.DateTimeField(default=timezone.now)
     createby = models.CharField(max_length=10, default='')
     createremarks = models.CharField(max_length=200, default='')
-    updatedt = models.DateField(default='1900-01-01')
+    updatedt = models.DateField(default='1900-01-01', null=False)
     updatetm = models.DateTimeField(default=datetime.datetime(1900, 1, 1))
     updateby = models.CharField(max_length=10, default='')
     updatemarks = models.CharField(max_length=200, default='')

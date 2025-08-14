@@ -887,58 +887,23 @@ def save_sale(request):
         return JsonResponse({'success': False, 'error': f"An error occurred: {str(e)}"})
     
 
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Count, Q, IntegerField, Value, F
-from django.db.models.functions import Cast, Substr
-from django.shortcuts import render, redirect
-from django.db import transaction
-from django.utils import timezone
-from decimal import Decimal
-import logging
+
+
+
 
 logger = logging.getLogger(__name__)
 
 def calculate_payment_details(sale):
-    """Calculate paid_amount, balance, and payment details for a sale."""
+    """Calculate paid_amount and balance for a sale."""
     try:
-        # Fetch journal entries for the sale
         paid_amount_query = JournalEntryLine.objects.filter(
             journal_entry__reference=sale.sale_no,
             journal_entry__business_unit=sale.business_unit,
             debit__gt=0
-        ).select_related('journal_entry', 'account')
-
-        # Calculate total paid amount
-        paid_amount = paid_amount_query.aggregate(total_paid=Sum('debit'))['total_paid'] or Decimal('0.00')
-        
-        # Ensure paid_amount is non-negative and does not exceed total_amount
-        if paid_amount < 0:
-            logger.warning(
-                f"Negative paid_amount detected for Sale {sale.sale_no}: "
-                f"paid_amount={paid_amount:.2f}, setting to 0.00"
-            )
-            paid_amount = Decimal('0.00')
-
-        if paid_amount > sale.total_amount:
-            logger.warning(
-                f"Overpayment detected for Sale {sale.sale_no}: "
-                f"paid_amount={paid_amount:.2f}, total_amount={sale.total_amount:.2f}"
-            )
-            paid_amount = sale.total_amount
-
-        # Calculate balance
+        )
+        paid_amount = paid_amount_query.aggregate(total_paid=Sum('debit'))['total_paid'] or Decimal('0.000')
         balance = sale.total_amount - paid_amount
         
-        # Ensure balance is non-negative
-        if balance < 0:
-            logger.error(
-                f"Negative balance calculated for Sale {sale.sale_no}: "
-                f"paid_amount={paid_amount:.2f}, total_amount={sale.total_amount:.2f}"
-            )
-            balance = Decimal('0.00')
-            paid_amount = sale.total_amount
-
         payment_details = [
             {
                 'journal_entry_id': jel.journal_entry.journal_entry_id,
@@ -951,7 +916,7 @@ def calculate_payment_details(sale):
                 'create_remarks': jel.create_remarks
             } for jel in paid_amount_query
         ]
-
+        
         all_entries = JournalEntryLine.objects.filter(
             journal_entry__reference=sale.sale_no,
             journal_entry__business_unit=sale.business_unit
@@ -968,20 +933,15 @@ def calculate_payment_details(sale):
                 'create_remarks': jel.create_remarks
             } for jel in all_entries
         ]
-
-        logger.debug(
-            f"Calculate Payment - Sale {sale.sale_no}: "
-            f"total_amount={sale.total_amount:.2f}, paid_amount={paid_amount:.2f}, "
-            f"balance={balance:.2f}, payment_details={payment_details}, all_entries={all_payment_details}"
-        )
-
+        logger.debug(f"Calculate Payment - Sale {sale.sale_no}: total_amount={sale.total_amount:.3f}, paid_amount={paid_amount:.3f}, balance={balance:.3f}, payment_details={payment_details}, all_entries={all_payment_details}")
+        
         account_types = list(set(jel['account_type'] for jel in all_payment_details))
         logger.debug(f"Calculate Payment - Sale {sale.sale_no}: account_types={account_types}")
-
+        
         return paid_amount, balance, payment_details
     except Exception as e:
         logger.error(f"Error calculating payment details for Sale {sale.sale_no}: {str(e)}")
-        return Decimal('0.00'), sale.total_amount, []
+        return Decimal('0.000'), sale.total_amount, []
 
 @login_required
 def process_payment(request):
@@ -1010,7 +970,7 @@ def process_payment(request):
         total_amount = sale.total_amount
         business_unit_id = sale.business_unit.business_unit_id
 
-        if sale.payment_status == 'Paid':
+        if sale.payment_status not in ['Unpaid', 'Partially Paid']:
             logger.warning(f"Sale already paid: {sale_id}")
             messages.error(request, "This sale has already been paid.")
             return redirect('view_order')
@@ -1021,12 +981,8 @@ def process_payment(request):
             return redirect('view_order')
 
         paid_amount, balance, payment_details = calculate_payment_details(sale)
-
-        logger.debug(
-            f"Process Payment - Sale {sale.sale_no}: "
-            f"total_amount={total_amount:.2f}, paid_amount={paid_amount:.2f}, "
-            f"balance={balance:.2f}, business_unit_id={business_unit_id}, payment_details={payment_details}"
-        )
+        
+        logger.debug(f"Process Payment - Sale {sale.sale_no}: total_amount={total_amount:.3f}, paid_amount={paid_amount:.3f}, balance={balance:.3f}, business_unit_id={business_unit_id}, payment_details={payment_details}")
 
         payment_accounts = Category.objects.filter(
             category_type='PAYMENT_TYPE',
@@ -1036,7 +992,6 @@ def process_payment(request):
         if not payment_accounts:
             logger.warning(f"No payment accounts for business unit: {sale.business_unit}")
             messages.warning(request, "No payment methods available. Please contact the administrator.")
-            return redirect('view_order')
 
         context = {
             'sale': sale,
@@ -1046,11 +1001,7 @@ def process_payment(request):
             'payment_accounts': payment_accounts,
             'username': saas_username,
         }
-        logger.debug(
-            f"Process Payment - Sale {sale.sale_no}: Context sent to payment.html: "
-            f"total_amount={total_amount:.2f}, balance={balance:.2f}, paid_amount={paid_amount:.2f}, "
-            f"sale_no={sale.sale_no}, payment_accounts={list(context['payment_accounts'])}"
-        )
+        logger.debug(f"Process Payment - Sale {sale.sale_no}: Context sent to payment.html: total_amount={total_amount:.3f}, balance={balance:.3f}, paid_amount={paid_amount:.3f}, sale_no={sale.sale_no}, payment_accounts={list(context['payment_accounts'])}")
         return render(request, 'payment.html', context)
     except SalesHeader.DoesNotExist:
         logger.error(f"Sale not found: {sale_id}")
@@ -1060,6 +1011,7 @@ def process_payment(request):
         logger.error(f"Error in process_payment: {str(e)}")
         messages.error(request, f"Error processing payment: {str(e)}")
         return redirect('view_order')
+
 
 @login_required
 @transaction.atomic
@@ -1086,16 +1038,18 @@ def confirm_payment(request):
     card_no = request.POST.get('card_no', '')
     remarks = request.POST.get('remarks', '')
 
-    logger.debug(
-        f"Confirm Payment - Received POST data: sale_id={sale_id}, total_amount={total_amount}, "
-        f"net_amount={net_amount}, payment_method_id={payment_method_id}, card_no='{card_no}', remarks='{remarks}'"
-    )
+    logger.debug(f"Confirm Payment - Received POST data: sale_id={sale_id}, total_amount={total_amount}, net_amount={net_amount}, payment_method_id={payment_method_id}, card_no='{card_no}', remarks='{remarks}'")
 
     if not all([sale_id, total_amount, net_amount, payment_method_id]):
-        missing = [field for field, value in [
-            ('sale_id', sale_id), ('total_amount', total_amount),
-            ('net_amount', net_amount), ('payment_method', payment_method_id)
-        ] if not value]
+        missing = []
+        if not sale_id:
+            missing.append("sale_id")
+        if not total_amount:
+            missing.append("total_amount")
+        if not net_amount:
+            missing.append("net_amount")
+        if not payment_method_id:
+            missing.append("payment_method")
         logger.warning(f"Missing fields in confirm_payment: {missing}")
         messages.error(request, f"Missing required fields: {', '.join(missing)}.")
         return redirect('process_payment')
@@ -1106,13 +1060,8 @@ def confirm_payment(request):
         net_amount = Decimal(net_amount)
 
         paid_amount, current_balance, payment_details = calculate_payment_details(sale)
-
-        logger.debug(
-            f"Confirm Payment - Sale {sale.sale_no}: "
-            f"total_amount={total_amount:.2f}, paid_amount={paid_amount:.2f}, "
-            f"current_balance={current_balance:.2f}, net_amount={net_amount:.2f}, "
-            f"business_unit_id={sale.business_unit.business_unit_id}, payment_details={payment_details}"
-        )
+        
+        logger.debug(f"Confirm Payment - Sale {sale.sale_no}: total_amount={total_amount:.3f}, paid_amount={paid_amount:.3f}, current_balance={current_balance:.3f}, net_amount={net_amount:.3f}, business_unit_id={sale.business_unit.business_unit_id}, payment_details={payment_details}")
 
         if net_amount <= 0:
             logger.warning(f"Invalid net_amount: {net_amount}")
@@ -1183,14 +1132,13 @@ def confirm_payment(request):
         revenue_amount = net_amount - tax_amount
 
         payment_remarks = f"{'Partial ' if payment_status == 'Partially Paid' else ''}Payment received for Sale No: {sale.sale_no}"
-        update_marks = f"{'Partial ' if payment_status == 'Partially Paid' else ''}Payment of {net_amount:.2f} processed on {current_date}"
+        update_marks = f"{'Partial ' if payment_status == 'Partially Paid' else ''}Payment of {net_amount:.3f} processed on {current_date}"
         if card_no or remarks:
             payment_remarks += f"; Card No: {card_no or 'N/A'}; Remarks: {remarks or 'None'}"
             update_marks += f"; Card No: {card_no or 'N/A'}; Remarks: {remarks or 'None'}"
 
         logger.debug(f"Confirm Payment - Sale {sale.sale_no}: payment_remarks='{payment_remarks}', update_marks='{update_marks}'")
 
-        # Update sale details
         sale.payment_method = payment_category.category_name
         sale.payment_status = payment_status
         sale.update_dt = current_date
@@ -1199,7 +1147,6 @@ def confirm_payment(request):
         sale.update_marks = update_marks
         sale.save(update_fields=['payment_method', 'payment_status', 'update_dt', 'update_tm', 'update_by', 'update_marks'])
 
-        # Create journal entry
         journal_entry = JournalEntries.objects.create(
             business_unit=sale.business_unit,
             journal_entry_date=current_date,
@@ -1217,13 +1164,12 @@ def confirm_payment(request):
             update_marks=''
         )
 
-        # Create journal entry lines
-        JournalEntryLine.objects.create(
+        payment_line = JournalEntryLine.objects.create(
             business_unit=sale.business_unit,
             journal_entry=journal_entry,
             account=payment_account,
             debit=net_amount,
-            credit=Decimal('0.00'),
+            credit=Decimal('0.000'),
             create_dt=current_date,
             create_tm=current_time,
             create_by=saas_username,
@@ -1238,7 +1184,7 @@ def confirm_payment(request):
             business_unit=sale.business_unit,
             journal_entry=journal_entry,
             account=sales_account,
-            debit=Decimal('0.00'),
+            debit=Decimal('0.000'),
             credit=revenue_amount,
             create_dt=current_date,
             create_tm=current_time,
@@ -1254,7 +1200,7 @@ def confirm_payment(request):
             business_unit=sale.business_unit,
             journal_entry=journal_entry,
             account=tax_account,
-            debit=Decimal('0.00'),
+            debit=Decimal('0.000'),
             credit=tax_amount,
             create_dt=current_date,
             create_tm=current_time,
@@ -1266,51 +1212,35 @@ def confirm_payment(request):
             update_marks=''
         )
 
-        # Update account balances
         for account, amount, remark in [
             (payment_account, net_amount, f"{'Partial ' if payment_status == 'Partially Paid' else ''}Payment of Sale No: {sale.sale_no}"),
-            (sales_account, revenue_amount, f"Revenue of Sale No: {sale.sale_no}"),
-            (tax_account, tax_amount, f"Tax payable of Sale No: {sale.sale_no}")
+            (sales_account, -revenue_amount, f"Revenue of Sale No: {sale.sale_no}"),
+            (tax_account, -tax_amount, f"Tax payable of Sale No: {sale.sale_no}")
         ]:
             if amount != 0:
-                # Asset accounts (payment_account) increase with debit, revenue/liability accounts increase with credit
-                account.account_balance += amount if account.account_type in ['Asset', 'Cash'] else -amount
+                account.account_balance += amount
                 account.update_dt = current_date
                 account.update_tm = current_time
                 account.update_by = saas_username
                 account.update_marks = f"Updated balance for {remark}"
                 account.save(update_fields=['account_balance', 'update_dt', 'update_tm', 'update_by', 'update_marks'])
 
-        # Verify saved payment
         saved_payment = JournalEntryLine.objects.filter(
             journal_entry__reference=sale.sale_no,
             journal_entry__business_unit=sale.business_unit,
             debit=net_amount,
             create_remarks=payment_remarks
         ).first()
-        if not saved_payment:
-            logger.error(
-                f"Confirm Payment - Sale {sale.sale_no}: Failed to verify saved payment for {net_amount:.2f}, "
-                f"payment_remarks='{payment_remarks}'"
-            )
+        if saved_payment:
+            logger.debug(f"Confirm Payment - Sale {sale.sale_no}: Payment saved successfully, journal_entry_line_id={saved_payment.journal_entry_line_id}, create_remarks='{saved_payment.create_remarks}'")
+        else:
+            logger.error(f"Confirm Payment - Sale {sale.sale_no}: Failed to verify saved payment for {net_amount:.3f}, payment_remarks='{payment_remarks}'")
             messages.error(request, f"Payment processing issue for Sale No: {sale.sale_no}. Please try again.")
             return redirect('process_payment')
 
-        logger.debug(
-            f"Confirm Payment - Sale {sale.sale_no}: Payment saved successfully, "
-            f"journal_entry_line_id={saved_payment.journal_entry_line_id}, create_remarks='{saved_payment.create_remarks}'"
-        )
-        logger.debug(
-            f"Confirm Payment - Sale {sale.sale_no}: Payment of {net_amount:.2f}, "
-            f"new_paid_amount={new_paid_amount:.2f}, payment_status={payment_status}, "
-            f"tax_amount={tax_amount:.2f}, revenue_amount={revenue_amount:.2f}"
-        )
+        logger.debug(f"Confirm Payment - Sale {sale.sale_no}: Payment of {net_amount:.3f}, new_paid_amount={new_paid_amount:.3f}, payment_status={payment_status}, tax_amount={tax_amount:.3f}, revenue_amount={revenue_amount:.3f}")
 
-        messages.success(
-            request,
-            f"{'Partial ' if payment_status == 'Partially Paid' else ''}Payment of {net_amount:.2f} "
-            f"for Sale No: {sale.sale_no} processed successfully."
-        )
+        messages.success(request, f"{'Partial ' if payment_status == 'Partially Paid' else ''}Payment of {net_amount:.3f} for Sale No: {sale.sale_no} processed successfully.")
         return redirect('view_order')
     except SalesHeader.DoesNotExist:
         logger.error(f"Sale not found: {sale_id}")
@@ -1325,12 +1255,17 @@ def confirm_payment(request):
         messages.error(request, f"Error confirming payment: {str(e)}")
         return redirect('process_payment')
 
+
+
+
+   
+
+
 @login_required
 def payment_view(request):
     saas_user_id = request.session.get('saas_user_id')
     if not saas_user_id:
         logger.warning("No saas_user_id in payment_view")
-        messages.error(request, "User not logged in.")
         return redirect('login')
 
     try:
@@ -1338,15 +1273,12 @@ def payment_view(request):
         saas_username = user.saas_username
         
         sale_id = request.GET.get('sale_id')
-        if not sale_id:
-            logger.warning("Missing sale_id in payment_view")
-            messages.error(request, "Missing sale_id.")
-            return redirect('home')
-
-        sale = SalesHeader.objects.get(sale_id=sale_id)
-        paid_amount, balance, payment_details = calculate_payment_details(sale)
+        sale = SalesHeader.objects.get(sale_id=sale_id)       
+        
 
         business_unit_id = sale.business_unit.business_unit_id
+
+
         payment_accounts = Category.objects.filter(
             category_type='PAYMENT_TYPE',
             business_unit_id=business_unit_id
@@ -1358,27 +1290,24 @@ def payment_view(request):
             'sale_id': sale_id,
             'username': saas_username,
             'payment_accounts': payment_accounts,
-            'paid_amount': paid_amount,
-            'balance': balance,
         }
-        logger.debug(
-            f"Payment View - Sale {sale.sale_no}: "
-            f"total_amount={sale.total_amount:.2f}, paid_amount={paid_amount:.2f}, "
-            f"balance={balance:.2f}, payment_accounts={list(payment_accounts)}"
-        )
         return render(request, 'payment.html', context)
     except SalesHeader.DoesNotExist:
         logger.error(f"Sale not found: {sale_id}")
-        messages.error(request, "Sale not found.")
         return redirect('home')
     except SAASUsers.DoesNotExist:
         logger.error(f"User not found: {saas_user_id}")
-        messages.error(request, "User not found.")
         return redirect('login')
     except Exception as e:
         logger.error(f"Error in payment_view: {str(e)}")
         messages.error(request, f"Error loading payment view: {str(e)}")
         return redirect('home')
+    
+
+
+
+
+logger = logging.getLogger(__name__)
 
 @login_required
 def view_order(request):
@@ -1408,18 +1337,32 @@ def view_order(request):
         ).order_by('-sale_no', 'status_priority', F('update_dt').desc(nulls_last=True), '-sale_date')
 
         sales_data = []
+        updated_sale_nos = []
+
         for sale in unpaid_sales:
             paid_amount, balance, payment_details = calculate_payment_details(sale)
+
+            new_payment_status = 'Unpaid'
+            if paid_amount > 0:
+                new_payment_status = 'Partially Paid' if paid_amount < sale.total_amount else 'Paid'
+                if sale.payment_status != new_payment_status:
+                    sale.payment_status = new_payment_status
+                    sale.update_dt = today
+                    sale.update_tm = timezone.now()
+                    sale.update_marks = f"Payment status updated to {new_payment_status} on {sale.update_dt}"
+                    sale.save(update_fields=['payment_status', 'update_dt', 'update_tm', 'update_marks'])
+                    sale.is_updated = new_payment_status == 'Partially Paid'
+                    if sale.is_updated:
+                        updated_sale_nos.append(sale.sale_no)
+                else:
+                    sale.is_updated = False
+            else:
+                sale.is_updated = False
+
             sale.paid_amount = paid_amount
             sale.balance = balance
 
-            logger.debug(
-                f"View Order - Sale {sale.sale_no}: "
-                f"total_amount={sale.total_amount:.2f}, paid_amount={paid_amount:.2f}, "
-                f"balance={balance:.2f}, business_unit_id={sale.business_unit.business_unit_id}, "
-                f"update_dt={sale.update_dt}, sale_date={sale.sale_date}, "
-                f"payment_details={payment_details}"
-            )
+            logger.debug(f"View Order - Sale {sale.sale_no}: total_amount={sale.total_amount:.3f}, paid_amount={paid_amount:.3f}, balance={balance:.3f}, business_unit_id={sale.business_unit.business_unit_id}, update_dt={sale.update_dt}, sale_date={sale.sale_date}, update_marks={sale.update_marks}, payment_details={payment_details}")
 
             sales_data.append({
                 'sale_no': sale.sale_no,
@@ -1434,7 +1377,7 @@ def view_order(request):
         context = {
             'unpaid_sales': unpaid_sales,
         }
-        logger.debug(f"View Order: Context sent to view_order.html: unpaid_sales={sales_data}")
+        logger.debug(f"View Order: Context sent to view_order.html: unpaid_sales={sales_data}, updated_sale_nos={updated_sale_nos}")
         return render(request, 'view_order.html', context)
 
     except Exception as e:
@@ -1442,19 +1385,21 @@ def view_order(request):
         messages.error(request, f"Error: {str(e)}")
         return redirect('home')
 
+
+
+
+logger = logging.getLogger(__name__)
+
 @login_required
 def sale_inquiry(request):
     business_unit_id = request.session.get('business_unit_id')
-    if not business_unit_id:
-        logger.warning("No business_unit_id in session")
-        messages.error(request, "Business unit not found. Please log in again.")
-        return redirect('home')
-
     try:
+        
         start_date = request.GET.get('start_date')
         end_date = request.GET.get('end_date')
         payment_status = request.GET.getlist('payment_status')
 
+        
         unpaid_sales = SalesHeader.objects.filter(
             business_unit_id=business_unit_id,
             payment_status__in=['Unpaid', 'Partially Paid', 'Paid']
@@ -1462,14 +1407,16 @@ def sale_inquiry(request):
          .annotate(total_items=Count('salesline'))\
          .annotate(
              sale_no_numeric=Cast(
-                 Substr('sale_no', 6),
+                 Substr('sale_no', 6),  
                  output_field=IntegerField()
              )
-         ).order_by('-sale_no_numeric')
+         ).order_by('-sale_no_numeric')  
 
+     
         if payment_status:
             unpaid_sales = unpaid_sales.filter(payment_status__in=payment_status)
 
+        
         if start_date:
             start_date = parse_date(start_date)
             if start_date:
@@ -1485,20 +1432,46 @@ def sale_inquiry(request):
                     Q(payment_status__in=['Unpaid', 'Paid'], sale_date__lte=end_date)
                 )
 
+       
         sales_data = []
+        updated_sale_nos = []
         for sale in unpaid_sales:
             paid_amount, balance, payment_details = calculate_payment_details(sale)
+
+            
+            new_payment_status = 'Unpaid'
+            if paid_amount > 0:
+                new_payment_status = 'Partially Paid' if paid_amount < sale.total_amount else 'Paid'
+                if sale.payment_status != new_payment_status:
+                    sale.payment_status = new_payment_status
+                    sale.update_dt = timezone.now().date()
+                    sale.update_tm = timezone.now()
+                    sale.update_marks = f"Payment status updated to {new_payment_status} on {sale.update_dt}"
+                    sale.save(update_fields=['payment_status', 'update_dt', 'update_tm', 'update_marks'])
+                    if new_payment_status == 'Partially Paid':
+                        updated_sale_nos.append(sale.sale_no)
+                        sale.is_updated = True
+                    else:
+                        sale.is_updated = False
+                else:
+                    sale.is_updated = False
+            else:
+                sale.is_updated = False
+
+            
             sale.paid_amount = paid_amount
             sale.balance = balance
 
+           
             logger.debug(
-                f"Sale Inquiry - Sale {sale.sale_no}: "
-                f"total_amount={sale.total_amount:.2f}, paid_amount={paid_amount:.2f}, "
-                f"balance={balance:.2f}, business_unit_id={sale.business_unit.business_unit_id}, "
+                f"sale_inquiry - Sale {sale.sale_no}: "
+                f"total_amount={sale.total_amount:.3f}, paid_amount={paid_amount:.3f}, "
+                f"balance={balance:.3f}, business_unit_id={sale.business_unit.business_unit_id}, "
                 f"update_dt={sale.update_dt}, update_marks={sale.update_marks}, "
                 f"payment_details={payment_details}"
             )
 
+           
             sales_data.append({
                 'sale_no': sale.sale_no,
                 'total_amount': float(sale.total_amount),
@@ -1508,6 +1481,7 @@ def sale_inquiry(request):
                 'update_dt': sale.update_dt
             })
 
+       
         context = {
             'unpaid_sales': unpaid_sales,
             'start_date': start_date,
@@ -1515,8 +1489,9 @@ def sale_inquiry(request):
             'payment_status': payment_status,
         }
         logger.debug(
-            f"Sale Inquiry: Context sent to sale_inquiry.html: "
-            f"unpaid_sales={sales_data}, payment_status={payment_status}"
+            f"sale_inquiry: Context sent to sale_inquiry.html: "
+            f"unpaid_sales={sales_data}, updated_sale_nos={updated_sale_nos}, "
+            f"payment_status={payment_status}"
         )
 
         return render(request, 'sale_inquiry.html', context)
@@ -1525,16 +1500,20 @@ def sale_inquiry(request):
         logger.error(f"Error in sale_inquiry: {str(e)}")
         messages.error(request, f"Error: {str(e)}")
         return redirect('home')
+    
 
 @login_required
 def sale_detail(request, sale_id):
     try:
+      
         sale = SalesHeader.objects.select_related(
             'customer', 'business_unit', 'branch', 'table', 'room', 'vehicle'
         ).get(sale_id=sale_id, business_unit_id=request.session.get('business_unit_id'))
 
+        
         sale_lines = SalesLine.objects.select_related('product').filter(sale_id=sale_id)
 
+      
         paid_amount, balance, payment_details = calculate_payment_details(sale)
         sale.paid_amount = paid_amount
         sale.balance = balance
@@ -1545,13 +1524,13 @@ def sale_detail(request, sale_id):
         }
 
         logger.debug(
-            f"Sale Detail - Sale {sale.sale_no}: "
-            f"total_amount={sale.total_amount:.2f}, paid_amount={paid_amount:.2f}, "
-            f"balance={balance:.2f}, items_count={sale_lines.count()}"
+            f"sale_detail - Sale {sale.sale_no}: "
+            f"total_amount={sale.total_amount:.3f}, paid_amount={paid_amount:.3f}, "
+            f"balance={balance:.3f}, items_count={sale_lines.count()}"
         )
 
         return render(request, 'sale_detail.html', context)
-    
+
     except SalesHeader.DoesNotExist:
         logger.error(f"Sale with ID {sale_id} not found or unauthorized access.")
         messages.error(request, "Sale not found or you do not have access.")
@@ -1560,6 +1539,10 @@ def sale_detail(request, sale_id):
         logger.error(f"Error in sale_detail: {str(e)}")
         messages.error(request, f"Error: {str(e)}")
         return redirect('sale_inquiry')
+    
+        
+
+
         
 @login_required
 def customer_bills(request):
