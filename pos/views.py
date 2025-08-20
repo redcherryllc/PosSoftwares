@@ -48,8 +48,9 @@ from django.db.models.functions import Cast, Substr
 
 from django.contrib.auth import logout
 
+from .forms import SAASUsersForm, CategoryForm, BusinessUnitGroupForm, BusinessUnitForm, BranchForm, WarehouseForm, CustomerForm
 
-
+from django.db.models import Max
 
 logger = logging.getLogger(__name__)
 
@@ -336,6 +337,10 @@ def logout_view(request):
         messages.error(request, f"Error logging out: {str(e)}")
     return redirect('login')
 
+
+
+logger = logging.getLogger(__name__)
+
 @login_required
 @require_POST
 def add_customer(request):
@@ -352,15 +357,25 @@ def add_customer(request):
             customer.business_unit = business_unit
             customer.create_by = user.saas_username
             customer.save()
-            messages.success(request, "Customer added successfully!")
+            return JsonResponse({
+                'success': True,
+                'customer': {
+                    'customer_id': customer.customer_id,
+                    'customer_name': customer.customer_name,
+                }
+            })
         else:
-            messages.error(request, "Failed to add customer. Please check the form fields.")
             logger.warning(f"Invalid customer form: {form.errors}")
+            return JsonResponse({
+                'success': False,
+                'error': str(form.errors)
+            }, status=400)
     except Exception as e:
         logger.error(f"Error in add_customer: {str(e)}")
-        messages.error(request, f"Error: {str(e)}")
-
-    return redirect('home')
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
 
 
 logger = logging.getLogger(__name__)
@@ -889,6 +904,8 @@ def save_sale(request):
 
 
 
+
+
 logger = logging.getLogger(__name__)
 
 def calculate_payment_details(sale):
@@ -1009,6 +1026,7 @@ def process_payment(request):
         logger.error(f"Error in process_payment: {str(e)}")
         messages.error(request, f"Error processing payment: {str(e)}")
         return redirect('view_order')
+
 
 @login_required
 @transaction.atomic
@@ -1252,6 +1270,12 @@ def confirm_payment(request):
         messages.error(request, f"Error confirming payment: {str(e)}")
         return redirect('process_payment')
 
+
+
+
+   
+
+
 @login_required
 def payment_view(request):
     saas_user_id = request.session.get('saas_user_id')
@@ -1269,12 +1293,11 @@ def payment_view(request):
 
         business_unit_id = sale.business_unit.business_unit_id
 
+
         payment_accounts = Category.objects.filter(
             category_type='PAYMENT_TYPE',
             business_unit_id=business_unit_id
         ).values('category_id', 'category_name', 'category_value')
-
-        paid_amount, balance, payment_details = calculate_payment_details(sale)
 
         context = {
             'sale': sale,
@@ -1282,8 +1305,6 @@ def payment_view(request):
             'sale_id': sale_id,
             'username': saas_username,
             'payment_accounts': payment_accounts,
-            'paid_amount': paid_amount,
-            'balance': balance,
         }
         return render(request, 'payment.html', context)
     except SalesHeader.DoesNotExist:
@@ -1296,6 +1317,12 @@ def payment_view(request):
         logger.error(f"Error in payment_view: {str(e)}")
         messages.error(request, f"Error loading payment view: {str(e)}")
         return redirect('home')
+    
+
+
+
+
+logger = logging.getLogger(__name__)
 
 @login_required
 def view_order(request):
@@ -1325,9 +1352,28 @@ def view_order(request):
         ).order_by('-sale_no', 'status_priority', F('update_dt').desc(nulls_last=True), '-sale_date')
 
         sales_data = []
+        updated_sale_nos = []
 
         for sale in unpaid_sales:
             paid_amount, balance, payment_details = calculate_payment_details(sale)
+
+            new_payment_status = 'Unpaid'
+            if paid_amount > 0:
+                new_payment_status = 'Partially Paid' if paid_amount < sale.total_amount else 'Paid'
+                if sale.payment_status != new_payment_status:
+                    sale.payment_status = new_payment_status
+                    sale.update_dt = today
+                    sale.update_tm = timezone.now()
+                    sale.update_marks = f"Payment status updated to {new_payment_status} on {sale.update_dt}"
+                    sale.save(update_fields=['payment_status', 'update_dt', 'update_tm', 'update_marks'])
+                    sale.is_updated = new_payment_status == 'Partially Paid'
+                    if sale.is_updated:
+                        updated_sale_nos.append(sale.sale_no)
+                else:
+                    sale.is_updated = False
+            else:
+                sale.is_updated = False
+
             sale.paid_amount = paid_amount
             sale.balance = balance
 
@@ -1346,7 +1392,7 @@ def view_order(request):
         context = {
             'unpaid_sales': unpaid_sales,
         }
-        logger.debug(f"View Order: Context sent to view_order.html: unpaid_sales={sales_data}")
+        logger.debug(f"View Order: Context sent to view_order.html: unpaid_sales={sales_data}, updated_sale_nos={updated_sale_nos}")
         return render(request, 'view_order.html', context)
 
     except Exception as e:
@@ -1354,14 +1400,21 @@ def view_order(request):
         messages.error(request, f"Error: {str(e)}")
         return redirect('home')
 
+
+
+
+logger = logging.getLogger(__name__)
+
 @login_required
 def sale_inquiry(request):
     business_unit_id = request.session.get('business_unit_id')
     try:
+        
         start_date = request.GET.get('start_date')
         end_date = request.GET.get('end_date')
         payment_status = request.GET.getlist('payment_status')
 
+        
         unpaid_sales = SalesHeader.objects.filter(
             business_unit_id=business_unit_id,
             payment_status__in=['Unpaid', 'Partially Paid', 'Paid']
@@ -1372,11 +1425,13 @@ def sale_inquiry(request):
                  Substr('sale_no', 6),  
                  output_field=IntegerField()
              )
-         ).order_by('-sale_no_numeric')
+         ).order_by('-sale_no_numeric')  
 
+     
         if payment_status:
             unpaid_sales = unpaid_sales.filter(payment_status__in=payment_status)
 
+        
         if start_date:
             start_date = parse_date(start_date)
             if start_date:
@@ -1392,12 +1447,37 @@ def sale_inquiry(request):
                     Q(payment_status__in=['Unpaid', 'Paid'], sale_date__lte=end_date)
                 )
 
+       
         sales_data = []
+        updated_sale_nos = []
         for sale in unpaid_sales:
             paid_amount, balance, payment_details = calculate_payment_details(sale)
+
+            
+            new_payment_status = 'Unpaid'
+            if paid_amount > 0:
+                new_payment_status = 'Partially Paid' if paid_amount < sale.total_amount else 'Paid'
+                if sale.payment_status != new_payment_status:
+                    sale.payment_status = new_payment_status
+                    sale.update_dt = timezone.now().date()
+                    sale.update_tm = timezone.now()
+                    sale.update_marks = f"Payment status updated to {new_payment_status} on {sale.update_dt}"
+                    sale.save(update_fields=['payment_status', 'update_dt', 'update_tm', 'update_marks'])
+                    if new_payment_status == 'Partially Paid':
+                        updated_sale_nos.append(sale.sale_no)
+                        sale.is_updated = True
+                    else:
+                        sale.is_updated = False
+                else:
+                    sale.is_updated = False
+            else:
+                sale.is_updated = False
+
+            
             sale.paid_amount = paid_amount
             sale.balance = balance
 
+           
             logger.debug(
                 f"sale_inquiry - Sale {sale.sale_no}: "
                 f"total_amount={sale.total_amount:.3f}, paid_amount={paid_amount:.3f}, "
@@ -1406,6 +1486,7 @@ def sale_inquiry(request):
                 f"payment_details={payment_details}"
             )
 
+           
             sales_data.append({
                 'sale_no': sale.sale_no,
                 'total_amount': float(sale.total_amount),
@@ -1415,6 +1496,7 @@ def sale_inquiry(request):
                 'update_dt': sale.update_dt
             })
 
+       
         context = {
             'unpaid_sales': unpaid_sales,
             'start_date': start_date,
@@ -1423,7 +1505,8 @@ def sale_inquiry(request):
         }
         logger.debug(
             f"sale_inquiry: Context sent to sale_inquiry.html: "
-            f"unpaid_sales={sales_data}, payment_status={payment_status}"
+            f"unpaid_sales={sales_data}, updated_sale_nos={updated_sale_nos}, "
+            f"payment_status={payment_status}"
         )
 
         return render(request, 'sale_inquiry.html', context)
@@ -1432,16 +1515,20 @@ def sale_inquiry(request):
         logger.error(f"Error in sale_inquiry: {str(e)}")
         messages.error(request, f"Error: {str(e)}")
         return redirect('home')
+    
 
 @login_required
 def sale_detail(request, sale_id):
     try:
+      
         sale = SalesHeader.objects.select_related(
             'customer', 'business_unit', 'branch', 'table', 'room', 'vehicle'
         ).get(sale_id=sale_id, business_unit_id=request.session.get('business_unit_id'))
 
+        
         sale_lines = SalesLine.objects.select_related('product').filter(sale_id=sale_id)
 
+      
         paid_amount, balance, payment_details = calculate_payment_details(sale)
         sale.paid_amount = paid_amount
         sale.balance = balance
@@ -1467,6 +1554,9 @@ def sale_detail(request, sale_id):
         logger.error(f"Error in sale_detail: {str(e)}")
         messages.error(request, f"Error: {str(e)}")
         return redirect('sale_inquiry')
+    
+        
+
 
         
 @login_required
@@ -4958,3 +5048,878 @@ def vehicle_dashboard(request):
         logger.error(f"Error in vehicle_dashboard: {str(e)}")
         messages.error(request, f"Invalid session data: {str(e)}")
         return redirect('login')
+
+
+
+
+@login_required
+def saasuser_list(request):
+    saas_user_id = request.session.get('saas_user_id')
+    try:
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saasusers = SAASUsers.objects.filter(saas_customer=saas_user.saas_customer).order_by('-create_dt')
+        paginator = Paginator(saasusers, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+        return render(request, 'saasuser_list.html', {'page_obj': page_obj})
+    except SAASUsers.DoesNotExist:
+        messages.error(request, "Invalid user session.")
+        return redirect('login')
+
+@login_required
+def saasuser_delete(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    try:
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saasuser = get_object_or_404(SAASUsers, pk=pk, saas_customer=saas_user.saas_customer)
+        if request.method == 'POST':
+            saasuser.delete()
+            messages.success(request, "User deleted successfully.")
+            return redirect('saasuser_list')
+        return render(request, 'saasuser_confirm_delete.html', {'object': saasuser})
+    except Exception as e:
+        messages.error(request, f"Error: {str(e)}")
+        return redirect('saasuser_list')
+
+@login_required
+def saasuser_inquiry(request):
+    saas_user_id = request.session.get('saas_user_id')
+    try:
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saasusers = SAASUsers.objects.filter(saas_customer=saas_user.saas_customer)
+        return render(request, 'saasuser_inquiry.html', {'saasusers': saasusers})
+    except SAASUsers.DoesNotExist:
+        messages.error(request, "Invalid user session.")
+        return redirect('login')
+
+@login_required
+def saasuser_dashboard(request):
+    saas_user_id = request.session.get('saas_user_id')
+    try:
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saasuser_count = SAASUsers.objects.filter(saas_customer=saas_user.saas_customer).count()
+        return render(request, 'saasuser_dashboard.html', {'saasuser_count': saasuser_count})
+    except SAASUsers.DoesNotExist:
+        messages.error(request, "Invalid user session.")
+        return redirect('login')
+
+@login_required
+def category_add(request):
+    business_unit_id = request.session.get('business_unit_id')
+    saas_user_id = request.session.get('saas_user_id')
+    try:
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+    except SAASUsers.DoesNotExist:
+        messages.error(request, "Invalid user session.")
+        return redirect('login')
+    if request.method == 'POST':
+        form = CategoryForm(request.POST, business_unit=business_unit)
+        if form.is_valid():
+            category = form.save(commit=False)
+            category.business_unit_id = business_unit.business_unit_id
+            category.create_by = saas_user.saas_username
+            current_date = timezone.now().strftime('%Y-%m-%d')
+            category.create_remarks = f"Category created by {saas_user.saas_username} on {current_date}"
+            category.update_dt = '1900-01-01'
+            category.update_tm = '1900-01-01'
+            category.update_by = ''
+            category.update_marks = ''
+            category.save()
+            messages.success(request, "Category added successfully.")
+            return redirect('category_list')
+    else:
+        form = CategoryForm(business_unit=business_unit)
+    return render(request, 'category_add.html', {'form': form})
+
+@login_required
+def category_edit(request, pk):
+    business_unit_id = request.session.get('business_unit_id')
+    saas_user_id = request.session.get('saas_user_id')
+    try:
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        category = get_object_or_404(Category, pk=pk, business_unit_id=business_unit_id)
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+    except SAASUsers.DoesNotExist:
+        messages.error(request, "Invalid user session.")
+        return redirect('login')
+    if request.method == 'POST':
+        form = CategoryForm(request.POST, instance=category, business_unit=business_unit)
+        if form.is_valid():
+            category = form.save(commit=False)
+            changed_fields = []
+            field_display_names = {
+                'category_type': 'Category Type',
+                'category_value': 'Category Value',
+                'category_name': 'Category Name',
+            }
+            for field in form.changed_data:
+                changed_fields.append(field_display_names.get(field, field))
+            category.update_dt = date.today()
+            category.update_tm = timezone.now()
+            category.update_by = saas_user.saas_username[:10]
+            category.update_marks = (
+                f"Updated on {date.today().strftime('%Y-%m-%d')} by {saas_user.saas_username[:10]}. "
+                f"Fields changed: {', '.join(changed_fields)}" if changed_fields
+                else f"Form submitted on {date.today().strftime('%Y-%m-%d')} by {saas_user.saas_username[:10]} with no field changes"
+            )[:200]
+            category.business_unit_id = business_unit.business_unit_id
+            category.save()
+            messages.success(request, "Category updated successfully.")
+            return redirect('category_list')
+    else:
+        form = CategoryForm(instance=category, business_unit=business_unit)
+    return render(request, 'category_edit.html', {'form': form, 'category': category})
+
+@login_required
+def category_list(request):
+    business_unit_id = request.session.get('business_unit_id')
+    try:
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        categories = Category.objects.filter(business_unit_id=business_unit_id).order_by('-create_dt')
+        paginator = Paginator(categories, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+        return render(request, 'category_list.html', {'page_obj': page_obj})
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+
+@login_required
+def category_delete(request, pk):
+    business_unit_id = request.session.get('business_unit_id')
+    try:
+        category = get_object_or_404(Category, pk=pk, business_unit_id=business_unit_id)
+        if request.method == 'POST':
+            category.delete()
+            messages.success(request, "Category deleted successfully.")
+            return redirect('category_list')
+        return render(request, 'category_confirm_delete.html', {'object': category})
+    except Exception as e:
+        messages.error(request, f"Error: {str(e)}")
+        return redirect('category_list')
+
+@login_required
+def category_inquiry(request):
+    business_unit_id = request.session.get('business_unit_id')
+    try:
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        categories = Category.objects.filter(business_unit_id=business_unit_id)
+        return render(request, 'category_inquiry.html', {'categories': categories})
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+
+@login_required
+def category_dashboard(request):
+    business_unit_id = request.session.get('business_unit_id')
+    try:
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        category_count = Category.objects.filter(business_unit_id=business_unit_id).count()
+        return render(request, 'category_dashboard.html', {'category_count': category_count})
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+
+
+@login_required
+def businessunitgroup_list(request):
+    saas_user_id = request.session.get('saas_user_id')
+    try:
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        groups = BusinessUnitGroup.objects.filter(saas_customer=saas_user.saas_customer).order_by('-create_dt')
+        paginator = Paginator(groups, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+        return render(request, 'businessunitgroup_list.html', {'page_obj': page_obj})
+    except SAASUsers.DoesNotExist:
+        messages.error(request, "Invalid user session.")
+        return redirect('login')
+
+@login_required
+def businessunitgroup_delete(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    try:
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        group = get_object_or_404(BusinessUnitGroup, pk=pk, saas_customer=saas_user.saas_customer)
+        if request.method == 'POST':
+            group.delete()
+            messages.success(request, "Business Unit Group deleted successfully.")
+            return redirect('businessunitgroup_list')
+        return render(request, 'businessunitgroup_confirm_delete.html', {'object': group})
+    except Exception as e:
+        messages.error(request, f"Error: {str(e)}")
+        return redirect('businessunitgroup_list')
+
+@login_required
+def businessunitgroup_inquiry(request):
+    saas_user_id = request.session.get('saas_user_id')
+    try:
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        groups = BusinessUnitGroup.objects.filter(saas_customer=saas_user.saas_customer)
+        return render(request, 'businessunitgroup_inquiry.html', {'businessunitgroups': groups})
+    except SAASUsers.DoesNotExist:
+        messages.error(request, "Invalid user session.")
+        return redirect('login')
+
+@login_required
+def businessunitgroup_dashboard(request):
+    saas_user_id = request.session.get('saas_user_id')
+    try:
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        group_count = BusinessUnitGroup.objects.filter(saas_customer=saas_user.saas_customer).count()
+        return render(request, 'businessunitgroup_dashboard.html', {'businessunitgroup_count': group_count})
+    except SAASUsers.DoesNotExist:
+        messages.error(request, "Invalid user session.")
+        return redirect('login')
+
+
+
+@login_required
+def businessunit_list(request):
+    saas_user_id = request.session.get('saas_user_id')
+    try:
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        businessunits = BusinessUnit.objects.filter(business_unit_group__saas_customer=saas_user.saas_customer).order_by('-create_dt')
+        paginator = Paginator(businessunits, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+        return render(request, 'businessunit_list.html', {'page_obj': page_obj})
+    except SAASUsers.DoesNotExist:
+        messages.error(request, "Invalid user session.")
+        return redirect('login')
+
+@login_required
+def businessunit_delete(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    try:
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        businessunit = get_object_or_404(BusinessUnit, pk=pk, business_unit_group__saas_customer=saas_user.saas_customer)
+        if request.method == 'POST':
+            businessunit.delete()
+            messages.success(request, "Business Unit deleted successfully.")
+            return redirect('businessunit_list')
+        return render(request, 'businessunit_confirm_delete.html', {'object': businessunit})
+    except Exception as e:
+        messages.error(request, f"Error: {str(e)}")
+        return redirect('businessunit_list')
+
+@login_required
+def businessunit_inquiry(request):
+    saas_user_id = request.session.get('saas_user_id')
+    try:
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        businessunits = BusinessUnit.objects.filter(business_unit_group__saas_customer=saas_user.saas_customer)
+        return render(request, 'businessunit_inquiry.html', {'businessunits': businessunits})
+    except SAASUsers.DoesNotExist:
+        messages.error(request, "Invalid user session.")
+        return redirect('login')
+
+@login_required
+def businessunit_dashboard(request):
+    saas_user_id = request.session.get('saas_user_id')
+    try:
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        businessunit_count = BusinessUnit.objects.filter(business_unit_group__saas_customer=saas_user.saas_customer).count()
+        return render(request, 'businessunit_dashboard.html', {'businessunit_count': businessunit_count})
+    except SAASUsers.DoesNotExist:
+        messages.error(request, "Invalid user session.")
+        return redirect('login')
+
+
+
+@login_required
+def branch_list(request):
+    business_unit_id = request.session.get('business_unit_id')
+    try:
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branches = Branch.objects.filter(business_unit=business_unit).order_by('-create_dt')
+        paginator = Paginator(branches, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+        return render(request, 'branch_list.html', {'page_obj': page_obj})
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+
+@login_required
+def branch_delete(request, pk):
+    business_unit_id = request.session.get('business_unit_id')
+    try:
+        branch = get_object_or_404(Branch, pk=pk, business_unit__business_unit_id=business_unit_id)
+        if request.method == 'POST':
+            branch.delete()
+            messages.success(request, "Branch deleted successfully.")
+            return redirect('branch_list')
+        return render(request, 'branch_confirm_delete.html', {'object': branch})
+    except Exception as e:
+        messages.error(request, f"Error: {str(e)}")
+        return redirect('branch_list')
+
+@login_required
+def branch_inquiry(request):
+    business_unit_id = request.session.get('business_unit_id')
+    try:
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branches = Branch.objects.filter(business_unit=business_unit)
+        return render(request, 'branch_inquiry.html', {'branches': branches})
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+
+@login_required
+def branch_dashboard(request):
+    business_unit_id = request.session.get('business_unit_id')
+    try:
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch_count = Branch.objects.filter(business_unit=business_unit).count()
+        return render(request, 'branch_dashboard.html', {'branch_count': branch_count})
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+
+
+@login_required
+def warehouse_list(request):
+    business_unit_id = request.session.get('business_unit_id')
+    try:
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        warehouses = Warehouse.objects.filter(business_unit=business_unit).order_by('-create_dt')
+        paginator = Paginator(warehouses, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+        return render(request, 'warehouse_list.html', {'page_obj': page_obj})
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+
+@login_required
+def warehouse_delete(request, pk):
+    business_unit_id = request.session.get('business_unit_id')
+    try:
+        warehouse = get_object_or_404(Warehouse, pk=pk, business_unit__business_unit_id=business_unit_id)
+        if request.method == 'POST':
+            warehouse.delete()
+            messages.success(request, "Warehouse deleted successfully.")
+            return redirect('warehouse_list')
+        return render(request, 'warehouse_confirm_delete.html', {'object': warehouse})
+    except Exception as e:
+        messages.error(request, f"Error: {str(e)}")
+        return redirect('warehouse_list')
+
+@login_required
+def warehouse_inquiry(request):
+    business_unit_id = request.session.get('business_unit_id')
+    try:
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        warehouses = Warehouse.objects.filter(business_unit=business_unit)
+        return render(request, 'warehouse_inquiry.html', {'warehouses': warehouses})
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+
+@login_required
+def warehouse_dashboard(request):
+    business_unit_id = request.session.get('business_unit_id')
+    try:
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        warehouse_count = Warehouse.objects.filter(business_unit=business_unit).count()
+        return render(request, 'warehouse_dashboard.html', {'warehouse_count': warehouse_count})
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+
+@login_required
+def customer_add(request):
+    business_unit_id = request.session.get('business_unit_id')
+    saas_user_id = request.session.get('saas_user_id')
+    try:
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+    except SAASUsers.DoesNotExist:
+        messages.error(request, "Invalid user session.")
+        return redirect('login')
+    if request.method == 'POST':
+        form = CustomerForm(request.POST, business_unit=business_unit)
+        if form.is_valid():
+            customer = form.save(commit=False)
+            customer.business_unit = business_unit
+            customer.create_by = saas_user.saas_username
+            current_date = timezone.now().strftime('%Y-%m-%d')
+            customer.create_remarks = f"Customer created by {saas_user.saas_username} on {current_date}"
+            customer.update_dt = '1900-01-01'
+            customer.update_tm = '1900-01-01'
+            customer.update_by = ''
+            customer.update_marks = ''
+            customer.save()
+            messages.success(request, "Customer added successfully.")
+            return redirect('customer_list')
+    else:
+        form = CustomerForm(business_unit=business_unit)
+    return render(request, 'customer_add.html', {'form': form})
+
+@login_required
+def customer_edit(request, pk):
+    business_unit_id = request.session.get('business_unit_id')
+    saas_user_id = request.session.get('saas_user_id')
+    try:
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        customer = get_object_or_404(Customer, pk=pk, business_unit__business_unit_id=business_unit_id)
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+    except SAASUsers.DoesNotExist:
+        messages.error(request, "Invalid user session.")
+        return redirect('login')
+    if request.method == 'POST':
+        form = CustomerForm(request.POST, instance=customer, business_unit=business_unit)
+        if form.is_valid():
+            customer = form.save(commit=False)
+            changed_fields = []
+            field_display_names = {
+                'customer_name': 'Customer Name',
+                'phone_1': 'Phone 1',
+                'phone_2': 'Phone 2',
+                'email': 'Email',
+                'address': 'Address',
+            }
+            for field in form.changed_data:
+                changed_fields.append(field_display_names.get(field, field))
+            customer.update_dt = date.today()
+            customer.update_tm = timezone.now()
+            customer.update_by = saas_user.saas_username[:10]
+            customer.update_marks = (
+                f"Updated on {date.today().strftime('%Y-%m-%d')} by {saas_user.saas_username[:10]}. "
+                f"Fields changed: {', '.join(changed_fields)}" if changed_fields
+                else f"Form submitted on {date.today().strftime('%Y-%m-%d')} by {saas_user.saas_username[:10]} with no field changes"
+            )[:200]
+            customer.business_unit = business_unit
+            customer.save()
+            messages.success(request, "Customer updated successfully.")
+            return redirect('customer_list')
+    else:
+        form = CustomerForm(instance=customer, business_unit=business_unit)
+    return render(request, 'customer_edit.html', {'form': form, 'customer': customer})
+
+@login_required
+def customer_list(request):
+    business_unit_id = request.session.get('business_unit_id')
+    try:
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        customers = Customer.objects.filter(business_unit=business_unit).order_by('-create_dt')
+        paginator = Paginator(customers, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+        return render(request, 'customer_list.html', {'page_obj': page_obj})
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+
+@login_required
+def customer_delete(request, pk):
+    business_unit_id = request.session.get('business_unit_id')
+    try:
+        customer = get_object_or_404(Customer, pk=pk, business_unit__business_unit_id=business_unit_id)
+        if request.method == 'POST':
+            customer.delete()
+            messages.success(request, "Customer deleted successfully.")
+            return redirect('customer_list')
+        return render(request, 'customer_confirm_delete.html', {'object': customer})
+    except Exception as e:
+        messages.error(request, f"Error: {str(e)}")
+        return redirect('customer_list')
+
+@login_required
+def customer_inquiry(request):
+    business_unit_id = request.session.get('business_unit_id')
+    try:
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        customers = Customer.objects.filter(business_unit=business_unit)
+        return render(request, 'customer_inquiry.html', {'customers': customers})
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+
+@login_required
+def customer_dashboard(request):
+    business_unit_id = request.session.get('business_unit_id')
+    try:
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        customer_count = Customer.objects.filter(business_unit=business_unit).count()
+        return render(request, 'customer_dashboard.html', {'customer_count': customer_count})
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')        
+    
+
+
+
+@login_required
+def saasuser_add(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    try:
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist):
+        messages.error(request, "Invalid user or customer session.")
+        logger.error(f"Invalid session: saas_user_id={saas_user_id}, saas_customer_id={saas_customer_id}")
+        return redirect('login')
+    if request.method == 'POST':
+        form = SAASUsersForm(request.POST, saas_customer=saas_customer)
+        if form.is_valid():
+            saasuser = form.save(commit=False)
+          
+            max_id = SAASUsers.objects.aggregate(max_id=Max('saas_user_id'))['max_id']
+            if max_id is not None:
+                saasuser.saas_user_id = max_id + 1
+            else:
+                saasuser.saas_user_id = 1  
+            saasuser.create_by = saas_user.saas_username
+            current_date = timezone.now().strftime('%Y-%m-%d')
+            saasuser.create_remarks = f"User created by {saas_user.saas_username} on {current_date}"
+            saasuser.update_dt = '1900-01-01'
+            saasuser.update_tm = '1900-01-01'
+            saasuser.update_by = ''
+            saasuser.update_marks = ''
+            try:
+                saasuser.save()
+                messages.success(request, "User added successfully.")
+                return redirect('saasuser_list')
+            except Exception as e:
+                messages.error(request, f"Error saving user: {str(e)}")
+                logger.error(f"Error saving user: {str(e)}")
+    else:
+        form = SAASUsersForm(saas_customer=saas_customer)
+    return render(request, 'saasuser_add.html', {'form': form})
+
+@login_required
+def saasuser_edit(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    try:
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        saasuser = get_object_or_404(SAASUsers, pk=pk, saas_customer=saas_customer)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist):
+        messages.error(request, "Invalid user or customer session.")
+        logger.error(f"Invalid session: saas_user_id={saas_user_id}, saas_customer_id={saas_customer_id}")
+        return redirect('login')
+    if request.method == 'POST':
+        form = SAASUsersForm(request.POST, instance=saasuser, saas_customer=saas_customer)
+        if form.is_valid():
+            saasuser = form.save(commit=False)
+            changed_fields = []
+            field_display_names = {
+                'saas_username': 'Username',
+                'saas_user_password': 'Password',
+            }
+            for field in form.changed_data:
+                changed_fields.append(field_display_names.get(field, field))
+            saasuser.update_dt = date.today()
+            saasuser.update_tm = timezone.now()
+            saasuser.update_by = saas_user.saas_username[:10]
+            saasuser.update_marks = (
+                f"Updated on {date.today().strftime('%Y-%m-%d')} by {saas_user.saas_username[:10]}. "
+                f"Fields changed: {', '.join(changed_fields)}" if changed_fields
+                else f"Form submitted on {date.today().strftime('%Y-%m-%d')} by {saas_user.saas_username[:10]} with no field changes"
+            )[:200]
+            try:
+                saasuser.save()
+                messages.success(request, "User updated successfully.")
+                return redirect('saasuser_list')
+            except Exception as e:
+                messages.error(request, f"Error updating user: {str(e)}")
+                logger.error(f"Error updating user: {str(e)}")
+    else:
+        form = SAASUsersForm(instance=saasuser, saas_customer=saas_customer)
+    return render(request, 'saasuser_edit.html', {'form': form, 'saasuser': saasuser})
+
+
+
+@login_required
+def businessunitgroup_add(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    try:
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist):
+        messages.error(request, "Invalid user or customer session.")
+        logger.error(f"Invalid session: saas_user_id={saas_user_id}, saas_customer_id={saas_customer_id}")
+        return redirect('login')
+    if request.method == 'POST':
+        form = BusinessUnitGroupForm(request.POST, saas_customer=saas_customer)
+        if form.is_valid():
+            group = form.save(commit=False)
+            group.create_by = saas_user.saas_username
+            current_date = timezone.now().strftime('%Y-%m-%d')
+            group.create_remarks = f"Business Unit Group created by {saas_user.saas_username} on {current_date}"
+            group.update_dt = '1900-01-01'
+            group.update_tm = '1900-01-01'
+            group.update_by = ''
+            group.update_marks = ''
+            group.save()
+            messages.success(request, "Business Unit Group added successfully.")
+            return redirect('businessunitgroup_list')
+    else:
+        form = BusinessUnitGroupForm(saas_customer=saas_customer)
+    return render(request, 'businessunitgroup_add.html', {'form': form})
+
+@login_required
+def businessunitgroup_edit(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    try:
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        group = get_object_or_404(BusinessUnitGroup, pk=pk, saas_customer=saas_customer)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist):
+        messages.error(request, "Invalid user or customer session.")
+        logger.error(f"Invalid session: saas_user_id={saas_user_id}, saas_customer_id={saas_customer_id}")
+        return redirect('login')
+    if request.method == 'POST':
+        form = BusinessUnitGroupForm(request.POST, instance=group, saas_customer=saas_customer)
+        if form.is_valid():
+            group = form.save(commit=False)
+            changed_fields = []
+            field_display_names = {
+                'business_unit_group_name': 'Group Name',
+            }
+            for field in form.changed_data:
+                changed_fields.append(field_display_names.get(field, field))
+            group.update_dt = date.today()
+            group.update_tm = timezone.now()
+            group.update_by = saas_user.saas_username[:10]
+            group.update_marks = (
+                f"Updated on {date.today().strftime('%Y-%m-%d')} by {saas_user.saas_username[:10]}. "
+                f"Fields changed: {', '.join(changed_fields)}" if changed_fields
+                else f"Form submitted on {date.today().strftime('%Y-%m-%d')} by {saas_user.saas_username[:10]} with no field changes"
+            )[:200]
+            group.save()
+            messages.success(request, "Business Unit Group updated successfully.")
+            return redirect('businessunitgroup_list')
+    else:
+        form = BusinessUnitGroupForm(instance=group, saas_customer=saas_customer)
+    return render(request, 'businessunitgroup_edit.html', {'form': form, 'businessunitgroup': group})
+
+@login_required
+def businessunit_add(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    try:
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist):
+        messages.error(request, "Invalid user or customer session.")
+        logger.error(f"Invalid session: saas_user_id={saas_user_id}, saas_customer_id={saas_customer_id}")
+        return redirect('login')
+    if request.method == 'POST':
+        form = BusinessUnitForm(request.POST, saas_customer=saas_customer)
+        if form.is_valid():
+            businessunit = form.save(commit=False)
+            businessunit.create_by = saas_user.saas_username
+            current_date = timezone.now().strftime('%Y-%m-%d')
+            businessunit.create_remarks = f"Business Unit created by {saas_user.saas_username} on {current_date}"
+            businessunit.update_dt = '1900-01-01'
+            businessunit.update_tm = '1900-01-01'
+            businessunit.update_by = ''
+            businessunit.update_marks = ''
+            businessunit.save()
+            messages.success(request, "Business Unit added successfully.")
+            return redirect('businessunit_list')
+    else:
+        form = BusinessUnitForm(saas_customer=saas_customer)
+    return render(request, 'businessunit_add.html', {'form': form})
+
+@login_required
+def businessunit_edit(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    try:
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        businessunit = get_object_or_404(BusinessUnit, pk=pk, business_unit_group__saas_customer=saas_customer)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist):
+        messages.error(request, "Invalid user or customer session.")
+        logger.error(f"Invalid session: saas_user_id={saas_user_id}, saas_customer_id={saas_customer_id}")
+        return redirect('login')
+    if request.method == 'POST':
+        form = BusinessUnitForm(request.POST, instance=businessunit, saas_customer=saas_customer)
+        if form.is_valid():
+            businessunit = form.save(commit=False)
+            changed_fields = []
+            field_display_names = {
+                'business_unit_name': 'Business Unit Name',
+                'business_unit_currency': 'Currency',
+                'phone_1': 'Phone 1',
+                'phone_2': 'Phone 2',
+                'email': 'Email',
+                'address': 'Address',
+                'business_unit_group': 'Business Unit Group',
+            }
+            for field in form.changed_data:
+                changed_fields.append(field_display_names.get(field, field))
+            businessunit.update_dt = date.today()
+            businessunit.update_tm = timezone.now()
+            businessunit.update_by = saas_user.saas_username[:10]
+            businessunit.update_marks = (
+                f"Updated on {date.today().strftime('%Y-%m-%d')} by {saas_user.saas_username[:10]}. "
+                f"Fields changed: {', '.join(changed_fields)}" if changed_fields
+                else f"Form submitted on {date.today().strftime('%Y-%m-%d')} by {saas_user.saas_username[:10]} with no field changes"
+            )[:200]
+            businessunit.save()
+            messages.success(request, "Business Unit updated successfully.")
+            return redirect('businessunit_list')
+    else:
+        form = BusinessUnitForm(instance=businessunit, saas_customer=saas_customer)
+    return render(request, 'businessunit_edit.html', {'form': form, 'businessunit': businessunit})
+
+@login_required
+def branch_add(request):
+    saas_user_id = request.session.get('saas_user_id')
+    business_unit_id = request.session.get('business_unit_id')
+    try:
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+    except (SAASUsers.DoesNotExist, BusinessUnit.DoesNotExist):
+        messages.error(request, "Invalid user or business unit session.")
+        logger.error(f"Invalid session: saas_user_id={saas_user_id}, business_unit_id={business_unit_id}")
+        return redirect('login')
+    if request.method == 'POST':
+        form = BranchForm(request.POST, business_unit=business_unit)
+        if form.is_valid():
+            branch = form.save(commit=False)
+            branch.create_by = saas_user.saas_username
+            current_date = timezone.now().strftime('%Y-%m-%d')
+            branch.create_remarks = f"Branch created by {saas_user.saas_username} on {current_date}"
+            branch.update_dt = '1900-01-01'
+            branch.update_tm = '1900-01-01'
+            branch.update_by = ''
+            branch.update_marks = ''
+            branch.save()
+            messages.success(request, "Branch added successfully.")
+            return redirect('branch_list')
+    else:
+        form = BranchForm(business_unit=business_unit)
+    return render(request, 'branch_add.html', {'form': form})
+
+@login_required
+def branch_edit(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    business_unit_id = request.session.get('business_unit_id')
+    try:
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = get_object_or_404(Branch, pk=pk, business_unit=business_unit)
+    except (SAASUsers.DoesNotExist, BusinessUnit.DoesNotExist):
+        messages.error(request, "Invalid user or business unit session.")
+        logger.error(f"Invalid session: saas_user_id={saas_user_id}, business_unit_id={business_unit_id}")
+        return redirect('login')
+    if request.method == 'POST':
+        form = BranchForm(request.POST, instance=branch, business_unit=business_unit)
+        if form.is_valid():
+            branch = form.save(commit=False)
+            changed_fields = []
+            field_display_names = {
+                'branch_name': 'Branch Name',
+                'phone_1': 'Phone 1',
+                'phone_2': 'Phone 2',
+                'email': 'Email',
+                'address': 'Address',
+            }
+            for field in form.changed_data:
+                changed_fields.append(field_display_names.get(field, field))
+            branch.update_dt = date.today()
+            branch.update_tm = timezone.now()
+            branch.update_by = saas_user.saas_username[:10]
+            branch.update_marks = (
+                f"Updated on {date.today().strftime('%Y-%m-%d')} by {saas_user.saas_username[:10]}. "
+                f"Fields changed: {', '.join(changed_fields)}" if changed_fields
+                else f"Form submitted on {date.today().strftime('%Y-%m-%d')} by {saas_user.saas_username[:10]} with no field changes"
+            )[:200]
+            branch.save()
+            messages.success(request, "Branch updated successfully.")
+            return redirect('branch_list')
+    else:
+        form = BranchForm(instance=branch, business_unit=business_unit)
+    return render(request, 'branch_edit.html', {'form': form, 'branch': branch})
+
+@login_required
+def warehouse_add(request):
+    saas_user_id = request.session.get('saas_user_id')
+    business_unit_id = request.session.get('business_unit_id')
+    try:
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+    except (SAASUsers.DoesNotExist, BusinessUnit.DoesNotExist):
+        messages.error(request, "Invalid user or business unit session.")
+        logger.error(f"Invalid session: saas_user_id={saas_user_id}, business_unit_id={business_unit_id}")
+        return redirect('login')
+    if request.method == 'POST':
+        form = WarehouseForm(request.POST, business_unit=business_unit)
+        if form.is_valid():
+            warehouse = form.save(commit=False)
+            warehouse.create_by = saas_user.saas_username
+            current_date = timezone.now().strftime('%Y-%m-%d')
+            warehouse.create_remarks = f"Warehouse created by {saas_user.saas_username} on {current_date}"
+            warehouse.update_dt = '1900-01-01'
+            warehouse.update_tm = '1900-01-01'
+            warehouse.update_by = ''
+            warehouse.update_marks = ''
+            warehouse.save()
+            messages.success(request, "Warehouse added successfully.")
+            return redirect('warehouse_list')
+    else:
+        form = WarehouseForm(business_unit=business_unit)
+    return render(request, 'warehouse_add.html', {'form': form})
+
+@login_required
+def warehouse_edit(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    business_unit_id = request.session.get('business_unit_id')
+    try:
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        warehouse = get_object_or_404(Warehouse, pk=pk, business_unit=business_unit)
+    except (SAASUsers.DoesNotExist, BusinessUnit.DoesNotExist):
+        messages.error(request, "Invalid user or business unit session.")
+        logger.error(f"Invalid session: saas_user_id={saas_user_id}, business_unit_id={business_unit_id}")
+        return redirect('login')
+    if request.method == 'POST':
+        form = WarehouseForm(request.POST, instance=warehouse, business_unit=business_unit)
+        if form.is_valid():
+            warehouse = form.save(commit=False)
+            changed_fields = []
+            field_display_names = {
+                'warehouse_name': 'Warehouse Name',
+                
+                'branch': 'Branch',
+                'address': 'Address',
+            }
+            for field in form.changed_data:
+                changed_fields.append(field_display_names.get(field, field))
+            warehouse.update_dt = date.today()
+            warehouse.update_tm = timezone.now()
+            warehouse.update_by = saas_user.saas_username[:10]
+            warehouse.update_marks = (
+                f"Updated on {date.today().strftime('%Y-%m-%d')} by {saas_user.saas_username[:10]}. "
+                f"Fields changed: {', '.join(changed_fields)}" if changed_fields
+                else f"Form submitted on {date.today().strftime('%Y-%m-%d')} by {saas_user.saas_username[:10]} with no field changes"
+            )[:200]
+            warehouse.save()
+            messages.success(request, "Warehouse updated successfully.")
+            return redirect('warehouse_list')
+    else:
+        form = WarehouseForm(instance=warehouse, business_unit=business_unit)
+    return render(request, 'warehouse_edit.html', {'form': form, 'warehouse': warehouse})

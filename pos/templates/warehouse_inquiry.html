@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <h2 class="text-center mb-4">Warehouses Inquiry</h2>
+
+    {% if messages %}
+        <div class="messages">
+            {% for message in messages %}
+                <p class="{% if message.tags %}{{ message.tags }}{% endif %}">
+                    {% if message.tags == 'error' %}
+                        <i class="fas fa-exclamation-circle"></i>
+                    {% elif message.tags == 'success' %}
+                        <i class="fas fa-check-circle"></i>
+                    {% endif %}
+                    {{ message }}
+                </p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="card">
+        <div class="card-body">
+            <div class="table-wrapper">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Address</th>
+                                <th>Branch</th>
+                                <th>Business Unit</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for warehouse in warehouses %}
+                                <tr>
+                                    <td>{{ warehouse.warehouse_name }}</td>
+                                    <td>{{ warehouse.address|truncatechars:50 }}</td>
+                                    <td>{{ warehouse.branch }}</td>
+                                    <td>{{ warehouse.business_unit }}</td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center">No warehouses found.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<link rel="stylesheet" href="{% static 'images/css/list_inquiry.css' %}">
+{% endblock %}

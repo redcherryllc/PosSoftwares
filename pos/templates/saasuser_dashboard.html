@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block content %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <header class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
+            <h1 class="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800">SAAS User Dashboard</h1>
+            <a href="{% url 'saasuser_inquiry' %}" class="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-blue-700 flex items-center text-sm sm:text-base">
+                <i class="fas fa-list mr-2 text-sm sm:text-base"></i> View All Users
+            </a>
+        </header>
+        {% if messages %}
+            <div class="mb-6">
+                {% for message in messages %}
+                    <div class="p-3 sm:p-4 rounded-md text-sm sm:text-base
+                        {% if message.tags == 'error' %}bg-red-100 text-red-700{% endif %}
+                        {% if message.tags == 'success' %}bg-green-100 text-green-700{% endif %}
+                        {% if message.tags == 'warning' %}bg-orange-100 text-orange-700{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div class="bg-white p-4 sm:p-6 rounded-lg shadow-md flex items-center">
+                <div class="mr-3 sm:mr-4 text-green-600">
+                    <i class="fas fa-users fa-lg sm:fa-2x"></i>
+                </div>
+                <div>
+                    <h4 class="text-base sm:text-lg font-semibold text-gray-700">Total Users</h4>
+                    <p class="text-xl sm:text-2xl font-bold text-green-700">{{ saasuser_count }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="mt-6 text-xs sm:text-sm text-gray-600 flex items-center">
+            <i class="fas fa-lock mr-2 text-xs sm:text-sm"></i> Secure Data Access
+        </div>
+    </div>
+</body>
+{% endblock %}

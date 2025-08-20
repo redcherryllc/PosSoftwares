@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1 class="page-title">Add Business Unit</h1>
+    </div>
+
+    {% if messages %}
+        <div class="messages">
+            {% for message in messages %}
+                <p class="{{ message.tags }}">
+                    {% if message.tags == 'error' %}
+                        <i class="fas fa-exclamation-circle"></i>
+                    {% elif message.tags == 'success' %}
+                        <i class="fas fa-check-circle"></i>
+                    {% endif %}
+                    {{ message }}
+                </p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <form method="POST" class="card" id="businessunitForm">
+        {% csrf_token %}
+        <div class="card-header">
+            <h2><i class="fas fa-building"></i> New Business Unit</h2>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="{{ form.business_unit_name.id_for_label }}">
+                    {{ form.business_unit_name.label }} {% if form.business_unit_name.field.required %}<span class="text-danger">*</span>{% endif %}
+                </label>
+                {{ form.business_unit_name }}
+                {% if form.business_unit_name.errors %}
+                    <div class="error-text">
+                        {% for error in form.business_unit_name.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                {% if form.business_unit_name.help_text %}
+                    <div class="helper-text">{{ form.business_unit_name.help_text }}</div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.business_unit_currency.id_for_label }}">
+                    {{ form.business_unit_currency.label }} {% if form.business_unit_currency.field.required %}<span class="text-danger">*</span>{% endif %}
+                </label>
+                {{ form.business_unit_currency }}
+                {% if form.business_unit_currency.errors %}
+                    <div class="error-text">
+                        {% for error in form.business_unit_currency.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                {% if form.business_unit_currency.help_text %}
+                    <div class="helper-text">{{ form.business_unit_currency.help_text }}</div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.phone_1.id_for_label }}">
+                    {{ form.phone_1.label }} {% if form.phone_1.field.required %}<span class="text-danger">*</span>{% endif %}
+                </label>
+                {{ form.phone_1 }}
+                {% if form.phone_1.errors %}
+                    <div class="error-text">
+                        {% for error in form.phone_1.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                {% if form.phone_1.help_text %}
+                    <div class="helper-text">{{ form.phone_1.help_text }}</div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.phone_2.id_for_label }}">
+                    {{ form.phone_2.label }} {% if form.phone_2.field.required %}<span class="text-danger">*</span>{% endif %}
+                </label>
+                {{ form.phone_2 }}
+                {% if form.phone_2.errors %}
+                    <div class="error-text">
+                        {% for error in form.phone_2.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                {% if form.phone_2.help_text %}
+                    <div class="helper-text">{{ form.phone_2.help_text }}</div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.email.id_for_label }}">
+                    {{ form.email.label }} {% if form.email.field.required %}<span class="text-danger">*</span>{% endif %}
+                </label>
+                {{ form.email }}
+                {% if form.email.errors %}
+                    <div class="error-text">
+                        {% for error in form.email.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                {% if form.email.help_text %}
+                    <div class="helper-text">{{ form.email.help_text }}</div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.business_unit_group.id_for_label }}">
+                    {{ form.business_unit_group.label }} {% if form.business_unit_group.field.required %}<span class="text-danger">*</span>{% endif %}
+                </label>
+                {{ form.business_unit_group }}
+                {% if form.business_unit_group.errors %}
+                    <div class="error-text">
+                        {% for error in form.business_unit_group.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                {% if form.business_unit_group.help_text %}
+                    <div class="helper-text">{{ form.business_unit_group.help_text }}</div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.address.id_for_label }}">
+                    {{ form.address.label }} {% if form.address.field.required %}<span class="text-danger">*</span>{% endif %}
+                </label>
+                {{ form.address }}
+                {% if form.address.errors %}
+                    <div class="error-text">
+                        {% for error in form.address.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                {% if form.address.help_text %}
+                    <div class="helper-text">{{ form.address.help_text }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="btn-container">
+            <button type="submit" class="btn-primary">
+                <i class="fas fa-save"></i> Save Business Unit
+            </button>
+            <a href="{% url 'businessunit_list' %}" class="cancel-link">
+                <i class="fas fa-arrow-left"></i> Cancel
+            </a>
+        </div>
+    </form>
+</div>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<link rel="stylesheet" href="{% static 'images/css/add_form.css' %}">
+{% endblock %}

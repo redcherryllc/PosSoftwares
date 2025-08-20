@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1 class="page-title">Edit Warehouse</h1>
+    </div>
+
+    {% if messages %}
+        <div class="messages">
+            {% for message in messages %}
+                <p class="{{ message.tags }}">
+                    {% if message.tags == 'error' %}
+                        <i class="fas fa-exclamation-circle"></i>
+                    {% elif message.tags == 'success' %}
+                        <i class="fas fa-check-circle"></i>
+                    {% endif %}
+                    {{ message }}
+                </p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <form method="POST" class="card" id="warehouseForm">
+        {% csrf_token %}
+        <div class="card-header">
+            <h2><i class="fas fa-warehouse"></i> Edit Warehouse</h2>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="{{ form.warehouse_name.id_for_label }}">
+                    {{ form.warehouse_name.label }} {% if form.warehouse_name.field.required %}<span class="text-danger">*</span>{% endif %}
+                </label>
+                {{ form.warehouse_name }}
+                {% if form.warehouse_name.errors %}
+                    <div class="error-text">
+                        {% for error in form.warehouse_name.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                {% if form.warehouse_name.help_text %}
+                    <div class="helper-text">{{ form.warehouse_name.help_text }}</div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.branch.id_for_label }}">
+                    {{ form.branch.label }} {% if form.branch.field.required %}<span class="text-danger">*</span>{% endif %}
+                </label>
+                {{ form.branch }}
+                {% if form.branch.errors %}
+                    <div class="error-text">
+                        {% for error in form.branch.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                {% if form.branch.help_text %}
+                    <div class="helper-text">{{ form.branch.help_text }}</div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.address.id_for_label }}">
+                    {{ form.address.label }} {% if form.address.field.required %}<span class="text-danger">*</span>{% endif %}
+                </label>
+                {{ form.address }}
+                {% if form.address.errors %}
+                    <div class="error-text">
+                        {% for error in form.address.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                {% if form.address.help_text %}
+                    <div class="helper-text">{{ form.address.help_text }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="btn-container">
+            <button type="submit" class="btn-primary">
+                <i class="fas fa-save"></i> Save Changes
+            </button>
+            <a href="{% url 'warehouse_list' %}" class="cancel-link">
+                <i class="fas fa-arrow-left"></i> Cancel
+            </a>
+        </div>
+    </form>
+</div>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<link rel="stylesheet" href="{% static 'images/css/add_form.css' %}">
+{% endblock %}
