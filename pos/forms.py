@@ -250,7 +250,7 @@ class SupplierForm(forms.ModelForm):
 
     def save(self, commit=True):
         supplier = super().save(commit=False)
-        supplier.supplier_type = 'cash'  # Set default supplier_type to 'cash'
+        supplier.supplier_type = 'cash'  
         if commit:
             supplier.save()
         return supplier
@@ -344,3 +344,164 @@ class VehicleForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         self.business_unit = kwargs.pop('business_unit', None)
         super().__init__(*args, **kwargs)
+
+
+
+
+
+class CustomerForm(forms.ModelForm):
+    class Meta:
+        model = Customer
+        fields = ['customer_name', 'phone_1', 'phone_2', 'email', 'address']
+        widgets = {
+            'customer_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'phone_1': forms.NumberInput(attrs={'class': 'form-control'}),
+            'phone_2': forms.NumberInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.business_unit = kwargs.pop('business_unit', None)
+        super().__init__(*args, **kwargs)
+
+
+
+class CategoryForm(forms.ModelForm):
+    class Meta:
+        model = Category
+        fields = ['category_type', 'category_value', 'category_name']
+        widgets = {
+            'category_type': forms.TextInput(attrs={'class': 'form-control'}),
+            'category_value': forms.TextInput(attrs={'class': 'form-control'}),
+            'category_name': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.business_unit = kwargs.pop('business_unit', None)
+        super().__init__(*args, **kwargs)
+
+
+
+
+
+
+
+
+
+class SAASUsersForm(forms.ModelForm):
+    class Meta:
+        model = SAASUsers
+        fields = ['saas_username', 'saas_user_password']
+        widgets = {
+            'saas_username': forms.TextInput(attrs={'class': 'form-control'}),
+            'saas_user_password': forms.PasswordInput(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.saas_customer = kwargs.pop('saas_customer', None)
+        super().__init__(*args, **kwargs)
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+       
+        user.saas_user_password = self.cleaned_data['saas_user_password']
+        if self.saas_customer:
+            user.saas_customer = self.saas_customer
+        if commit:
+            user.save()
+        return user
+
+
+
+class BusinessUnitGroupForm(forms.ModelForm):
+    class Meta:
+        model = BusinessUnitGroup
+        fields = ['business_unit_group_name']  
+        widgets = {
+            'business_unit_group_name': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.saas_customer = kwargs.pop('saas_customer', None)
+        super().__init__(*args, **kwargs)
+
+    def save(self, commit=True):
+        group = super().save(commit=False)
+        if self.saas_customer:
+            group.saas_customer = self.saas_customer
+        if commit:
+            group.save()
+        return group
+
+class BusinessUnitForm(forms.ModelForm):
+    class Meta:
+        model = BusinessUnit
+        fields = ['business_unit_name', 'business_unit_currency', 'phone_1', 'phone_2', 'email', 'address', 'business_unit_group']
+        widgets = {
+            'business_unit_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'business_unit_currency': forms.TextInput(attrs={'class': 'form-control'}),
+            'phone_1': forms.NumberInput(attrs={'class': 'form-control'}),
+            'phone_2': forms.NumberInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+            'business_unit_group': forms.Select(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        saas_customer = kwargs.pop('saas_customer', None)
+        super().__init__(*args, **kwargs)
+        if saas_customer:
+            self.fields['business_unit_group'].queryset = BusinessUnitGroup.objects.filter(saas_customer=saas_customer)
+            if self.fields['business_unit_group'].queryset.count() == 1:
+                self.fields['business_unit_group'].initial = self.fields['business_unit_group'].queryset.first()
+                self.fields['business_unit_group'].widget.attrs['readonly'] = True
+
+class BranchForm(forms.ModelForm):
+    class Meta:
+        model = Branch
+        fields = ['branch_name', 'phone_1', 'phone_2', 'email', 'address']  
+        widgets = {
+            'branch_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'phone_1': forms.NumberInput(attrs={'class': 'form-control'}),
+            'phone_2': forms.NumberInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.business_unit = kwargs.pop('business_unit', None)
+        super().__init__(*args, **kwargs)
+
+    def save(self, commit=True):
+        branch = super().save(commit=False)
+        if self.business_unit:
+            branch.business_unit = self.business_unit
+        if commit:
+            branch.save()
+        return branch
+
+class WarehouseForm(forms.ModelForm):
+    class Meta:
+        model = Warehouse
+        fields = ['warehouse_name', 'branch', 'address'] 
+        widgets = {
+            'warehouse_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'branch': forms.Select(attrs={'class': 'form-control'}),
+            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
+            
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.business_unit = kwargs.pop('business_unit', None)
+        super().__init__(*args, **kwargs)
+        if self.business_unit:
+            self.fields['branch'].queryset = Branch.objects.filter(business_unit=self.business_unit)
+
+    def save(self, commit=True):
+        warehouse = super().save(commit=False)
+        if self.business_unit:
+            warehouse.business_unit = self.business_unit
+        if commit:
+            warehouse.save()
+        return warehouse

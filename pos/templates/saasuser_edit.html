@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1 class="page-title">Edit SAAS User</h1>
+    </div>
+
+    {% if messages %}
+        <div class="messages">
+            {% for message in messages %}
+                <p class="{{ message.tags }}">
+                    {% if message.tags == 'error' %}
+                        <i class="fas fa-exclamation-circle"></i>
+                    {% elif message.tags == 'success' %}
+                        <i class="fas fa-check-circle"></i>
+                    {% endif %}
+                    {{ message }}
+                </p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <form method="POST" class="card" id="saasuserForm">
+        {% csrf_token %}
+        <div class="card-header">
+            <h2><i class="fas fa-user"></i> Edit SAAS User</h2>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label for="{{ form.saas_username.id_for_label }}">
+                    {{ form.saas_username.label }} {% if form.saas_username.field.required %}<span class="text-danger">*</span>{% endif %}
+                </label>
+                {{ form.saas_username }}
+                {% if form.saas_username.errors %}
+                    <div class="error-text">
+                        {% for error in form.saas_username.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                {% if form.saas_username.help_text %}
+                    <div class="helper-text">{{ form.saas_username.help_text }}</div>
+                {% endif %}
+            </div>
+            <div class="form-group">
+                <label for="{{ form.saas_user_password.id_for_label }}">
+                    {{ form.saas_user_password.label }} {% if form.saas_user_password.field.required %}<span class="text-danger">*</span>{% endif %}
+                </label>
+                {{ form.saas_user_password }}
+                {% if form.saas_user_password.errors %}
+                    <div class="error-text">
+                        {% for error in form.saas_user_password.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                {% if form.saas_user_password.help_text %}
+                    <div class="helper-text">{{ form.saas_user_password.help_text }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="btn-container">
+            <button type="submit" class="btn-primary">
+                <i class="fas fa-save"></i> Save Changes
+            </button>
+            <a href="{% url 'saasuser_list' %}" class="cancel-link">
+                <i class="fas fa-arrow-left"></i> Cancel
+            </a>
+        </div>
+    </form>
+</div>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<link rel="stylesheet" href="{% static 'images/css/add_form.css' %}">
+{% endblock %}

@@ -583,13 +583,16 @@ class SalesHeader(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.pk or not self.sale_no or self.sale_no == '':
-            target_date = timezone.now().date()
-            
+            target_date = self.sale_date if self.sale_date else timezone.now().date()
+           
             daily_sales_count = SalesHeader.objects.filter(
+                business_unit=self.business_unit,
+                branch=self.branch,
                 sale_date=target_date
             ).count()
-            
-            self.sale_no = str(daily_sales_count + 1)
+            seq_num = str(daily_sales_count + 1).zfill(3)
+            date_str = target_date.strftime('%Y%m%d')
+            self.sale_no = f"{date_str}{seq_num}"
         
         super().save(*args, **kwargs)
 
@@ -599,16 +602,19 @@ class SalesHeader(models.Model):
         if not self.sale_date:
             return "20250101001"
         
-        if self.sale_no and self.sale_no.isdigit():
-            seq_num = self.sale_no.zfill(3)  
+        date_str = self.sale_date.strftime('%Y%m%d')
+        if self.sale_no and self.sale_no.startswith(date_str):
+            seq_num = self.sale_no[8:]  
         else:
+           
             earlier_sales = SalesHeader.objects.filter(
+                business_unit=self.business_unit,
+                branch=self.branch,
                 sale_date=self.sale_date,
                 sale_id__lt=self.sale_id if self.sale_id else 999999999
             ).count()
             seq_num = str(earlier_sales + 1).zfill(3)
         
-        date_str = self.sale_date.strftime('%Y%m%d')
         return f"{date_str}{seq_num}"
 
     @property
