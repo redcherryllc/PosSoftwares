@@ -15,72 +15,209 @@
     
 {% endblock %}
 
-
 {% block content %}
 
 
 
-
-    <div class="dashboard-grid">
-        <div class="left-column">
-            
-            <div class="menu-group">
-                <div class="menu-title"><i class="fas fa-cubes"></i> Master</div>
-                <div class="panel">
-                    <div class="panel-header">
-                        <div class="panel-title">Product Groups</div>
-                        <button class="action-button btn-secondary"><i class="fas fa-eye"></i> View All</button>
-                    </div>
-                    <div class="panel-content">
-                        <ul class="model-list">
-                            <li class="model-item">
-                                <span class="model-name">Product Groups</span>
-                                <div class="model-actions">
-                                    <a href="{% url 'productgroup_add' %}"><i class="fas fa-plus"></i> Add</a>
-                                    <a href="{% url 'productgroup_list' %}"><i class="fas fa-edit"></i> Modify</a>
-                                    <a href="{% url 'productgroup_list' %}"><i class="fas fa-trash"></i> Delete</a>
-                                    <a href="{% url 'productgroup_inquiry' %}"><i class="fas fa-search"></i> Inquiry</a>
-                                    <a href="{% url 'productgroup_dashboard' %}"><i class="fas fa-chart-bar"></i> Dashboard</a>
-                                </div>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-        
-            <div class="menu-group">
-                
-                <div class="menu-title"><i class="fas fa-shopping-cart"></i> Sales</div>
-                <div class="panel">
-                    <div class="panel-header">
-                        <div class="panel-title">Products</div>
-                        <button class="action-button btn-secondary"><i class="fas fa-eye"></i> View All</button>
-                    </div>
-                    <div class="panel-content">
-                        <ul class="model-list">
-                            <li class="model-item">
-                                <span class="model-name">Products</span>
-                                <div class="model-actions">
-                                    <a href="{% url 'product_add' %}"><i class="fas fa-plus"></i> Add</a>
-                                    <a href="{% url 'product_list' %}"><i class="fas fa-edit"></i> Modify</a>
-                                    <a href="{% url 'product_list' %}"><i class="fas fa-trash"></i> Delete</a>
-                                    <a href="{% url 'product_inquiry' %}"><i class="fas fa-search"></i> Inquiry</a>
-                                    <a href="{% url 'product_dashboard' %}"><i class="fas fa-chart-bar"></i> Dashboard</a>
-                                </div>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-        <div class="menu-group">   
-             <div class="menu-title"><i class="fas fa-truck"></i> Suppliers</div>   
-
+<div class="dashboard-grid">
+    <div class="left-column">
+        <div class="menu-group">
+            <div class="menu-title"><i class="fas fa-cubes"></i> Master</div>
             <div class="panel">
                 <div class="panel-header">
-                    <div class="panel-title">Suppliers</div>
-                    <button class="action-button btn-secondary"><i class="fas fa-eye"></i> View All</button>
+                    <div class="panel-title"><i class="fas fa-users"></i> SAAS Users</div>
+                    <button class="action-button btn-secondary"><a href="{% url 'saasuser_inquiry' %}"><i class="fas fa-eye"></i> View All</a></button>
+                </div>
+                <div class="panel-content">
+                    <ul class="model-list">
+                        <li class="model-item">
+                            <span class="model-name">SAAS Users</span>
+                            <div class="model-actions">
+                                <a href="{% url 'saasuser_add' %}"><i class="fas fa-plus"></i> Add</a>
+                                <a href="{% url 'saasuser_list' %}"><i class="fas fa-edit"></i> Modify</a>
+                                <a href="{% url 'saasuser_list' %}"><i class="fas fa-trash"></i> Delete</a>
+                                <a href="{% url 'saasuser_inquiry' %}"><i class="fas fa-search"></i> Inquiry</a>
+                                <a href="{% url 'saasuser_dashboard' %}"><i class="fas fa-chart-bar"></i> Dashboard</a>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title"><i class="fas fa-list"></i> Categories</div>
+                    <button class="action-button btn-secondary"><a href="{% url 'category_inquiry' %}"><i class="fas fa-eye"></i> View All</a></button>
+                </div>
+                <div class="panel-content">
+                    <ul class="model-list">
+                        <li class="model-item">
+                            <span class="model-name">Categories</span>
+                            <div class="model-actions">
+                                <a href="{% url 'category_add' %}"><i class="fas fa-plus"></i> Add</a>
+                                <a href="{% url 'category_list' %}"><i class="fas fa-edit"></i> Modify</a>
+                                <a href="{% url 'category_list' %}"><i class="fas fa-trash"></i> Delete</a>
+                                <a href="{% url 'category_inquiry' %}"><i class="fas fa-search"></i> Inquiry</a>
+                                <a href="{% url 'category_dashboard' %}"><i class="fas fa-chart-bar"></i> Dashboard</a>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title"><i class="fas fa-sitemap"></i> Business Unit Groups</div>
+                    <button class="action-button btn-secondary"><a href="{% url 'businessunitgroup_inquiry' %}"><i class="fas fa-eye"></i> View All</a></button>
+                </div>
+                <div class="panel-content">
+                    <ul class="model-list">
+                        <li class="model-item">
+                            <span class="model-name">Business Unit Groups</span>
+                            <div class="model-actions">
+                                <a href="{% url 'businessunitgroup_add' %}"><i class="fas fa-plus"></i> Add</a>
+                                <a href="{% url 'businessunitgroup_list' %}"><i class="fas fa-edit"></i> Modify</a>
+                                <a href="{% url 'businessunitgroup_list' %}"><i class="fas fa-trash"></i> Delete</a>
+                                <a href="{% url 'businessunitgroup_inquiry' %}"><i class="fas fa-search"></i> Inquiry</a>
+                                <a href="{% url 'businessunitgroup_dashboard' %}"><i class="fas fa-chart-bar"></i> Dashboard</a>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title"><i class="fas fa-briefcase"></i> Business Units</div>
+                    <button class="action-button btn-secondary"><a href="{% url 'businessunit_inquiry' %}"><i class="fas fa-eye"></i> View All</a></button>
+                </div>
+                <div class="panel-content">
+                    <ul class="model-list">
+                        <li class="model-item">
+                            <span class="model-name">Business Units</span>
+                            <div class="model-actions">
+                                <a href="{% url 'businessunit_add' %}"><i class="fas fa-plus"></i> Add</a>
+                                <a href="{% url 'businessunit_list' %}"><i class="fas fa-edit"></i> Modify</a>
+                                <a href="{% url 'businessunit_list' %}"><i class="fas fa-trash"></i> Delete</a>
+                                <a href="{% url 'businessunit_inquiry' %}"><i class="fas fa-search"></i> Inquiry</a>
+                                <a href="{% url 'businessunit_dashboard' %}"><i class="fas fa-chart-bar"></i> Dashboard</a>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title"><i class="fas fa-code-branch"></i> Branches</div>
+                    <button class="action-button btn-secondary"><a href="{% url 'branch_inquiry' %}"><i class="fas fa-eye"></i> View All</a></button>
+                </div>
+                <div class="panel-content">
+                    <ul class="model-list">
+                        <li class="model-item">
+                            <span class="model-name">Branches</span>
+                            <div class="model-actions">
+                                <a href="{% url 'branch_add' %}"><i class="fas fa-plus"></i> Add</a>
+                                <a href="{% url 'branch_list' %}"><i class="fas fa-edit"></i> Modify</a>
+                                <a href="{% url 'branch_list' %}"><i class="fas fa-trash"></i> Delete</a>
+                                <a href="{% url 'branch_inquiry' %}"><i class="fas fa-search"></i> Inquiry</a>
+                                <a href="{% url 'branch_dashboard' %}"><i class="fas fa-chart-bar"></i> Dashboard</a>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title"><i class="fas fa-warehouse"></i> Warehouses</div>
+                    <button class="action-button btn-secondary"><a href="{% url 'warehouse_inquiry' %}"><i class="fas fa-eye"></i> View All</a></button>
+                </div>
+                <div class="panel-content">
+                    <ul class="model-list">
+                        <li class="model-item">
+                            <span class="model-name">Warehouses</span>
+                            <div class="model-actions">
+                                <a href="{% url 'warehouse_add' %}"><i class="fas fa-plus"></i> Add</a>
+                                <a href="{% url 'warehouse_list' %}"><i class="fas fa-edit"></i> Modify</a>
+                                <a href="{% url 'warehouse_list' %}"><i class="fas fa-trash"></i> Delete</a>
+                                <a href="{% url 'warehouse_inquiry' %}"><i class="fas fa-search"></i> Inquiry</a>
+                                <a href="{% url 'warehouse_dashboard' %}"><i class="fas fa-chart-bar"></i> Dashboard</a>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            
+        </div>
+        
+        <div class="menu-group">
+            <div class="menu-title"><i class="fas fa-shopping-cart"></i> Sales</div>
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title"><i class="fas fa-user-friends"></i> Customers</div>
+                    <button class="action-button btn-secondary"><a href="{% url 'customer_inquiry' %}"><i class="fas fa-eye"></i> View All</a></button>
+                </div>
+                <div class="panel-content">
+                    <ul class="model-list">
+                        <li class="model-item">
+                            <span class="model-name">Customers</span>
+                            <div class="model-actions">
+                                <a href="{% url 'customer_add' %}"><i class="fas fa-plus"></i> Add</a>
+                                <a href="{% url 'customer_list' %}"><i class="fas fa-edit"></i> Modify</a>
+                                <a href="{% url 'customer_list' %}"><i class="fas fa-trash"></i> Delete</a>
+                                <a href="{% url 'customer_inquiry' %}"><i class="fas fa-search"></i> Inquiry</a>
+                                <a href="{% url 'customer_dashboard' %}"><i class="fas fa-chart-bar"></i> Dashboard</a>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title"><i class="fas fa-boxes"></i> Product Groups</div>
+                    <button class="action-button btn-secondary"><a href="{% url 'productgroup_inquiry' %}"><i class="fas fa-eye"></i> View All</a></button>
+                </div>
+                <div class="panel-content">
+                    <ul class="model-list">
+                        <li class="model-item">
+                            <span class="model-name">Product Groups</span>
+                            <div class="model-actions">
+                                <a href="{% url 'productgroup_add' %}"><i class="fas fa-plus"></i> Add</a>
+                                <a href="{% url 'productgroup_list' %}"><i class="fas fa-edit"></i> Modify</a>
+                                <a href="{% url 'productgroup_list' %}"><i class="fas fa-trash"></i> Delete</a>
+                                <a href="{% url 'productgroup_inquiry' %}"><i class="fas fa-search"></i> Inquiry</a>
+                                <a href="{% url 'productgroup_dashboard' %}"><i class="fas fa-chart-bar"></i> Dashboard</a>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title"><i class="fas fa-box"></i> Products</div>
+                    <button class="action-button btn-secondary"><a href="{% url 'product_inquiry' %}"><i class="fas fa-eye"></i> View All</a></button>
+                </div>
+                <div class="panel-content">
+                    <ul class="model-list">
+                        <li class="model-item">
+                            <span class="model-name">Products</span>
+                            <div class="model-actions">
+                                <a href="{% url 'product_add' %}"><i class="fas fa-plus"></i> Add</a>
+                                <a href="{% url 'product_list' %}"><i class="fas fa-edit"></i> Modify</a>
+                                <a href="{% url 'product_list' %}"><i class="fas fa-trash"></i> Delete</a>
+                                <a href="{% url 'product_inquiry' %}"><i class="fas fa-search"></i> Inquiry</a>
+                                <a href="{% url 'product_dashboard' %}"><i class="fas fa-chart-bar"></i> Dashboard</a>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="menu-group">
+            <div class="menu-title"><i class="fas fa-truck"></i> Suppliers</div>
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title"><i class="fas fa-user-tie"></i> Suppliers</div>
+                    <button class="action-button btn-secondary"><a href="{% url 'supplier_inquiry' %}"><i class="fas fa-eye"></i> View All</a></button>
                 </div>
                 <div class="panel-content">
                     <ul class="model-list">
@@ -89,7 +226,6 @@
                             <div class="model-actions">
                                 <a href="{% url 'supplier_add' %}"><i class="fas fa-plus"></i> Add</a>
                                 <a href="{% url 'supplier_list' %}"><i class="fas fa-edit"></i> Modify</a>
-                                {% comment %} <a href="{% url 'supplier_list' %}"><i class="fas fa-trash"></i> Delete</a> {% endcomment %}
                                 <a href="{% url 'supplier_inquiry' %}"><i class="fas fa-search"></i> Inquiry</a>
                                 <a href="{% url 'supplier_dashboard' %}"><i class="fas fa-chart-bar"></i> Dashboard</a>
                             </div>
@@ -97,116 +233,110 @@
                     </ul>
                 </div>
             </div>
-
         </div>
-
 
         <div class="menu-group">
-    <div class="menu-title"><i class="fas fa-building"></i> Rooms</div>
-    <div class="panel">
-        <div class="panel-header">
-            <div class="panel-title">Rooms</div>
-            <button class="action-button btn-secondary"><i class="fas fa-eye"></i> View All</button>
-        </div>
-        <div class="panel-content">
-            <ul class="model-list">
-                <li class="model-item">
-                    <span class="model-name">Rooms</span>
-                    <div class="model-actions">
-                        <a href="{% url 'room_add' %}"><i class="fas fa-plus"></i> Add</a>
-                        <a href="{% url 'room_list' %}"><i class="fas fa-edit"></i> Modify</a>
-                        <a href="{% url 'room_list' %}"><i class="fas fa-trash"></i> Delete</a>
-                        <a href="{% url 'room_inquiry' %}"><i class="fas fa-search"></i> Inquiry</a>
-                        <a href="{% url 'room_dashboard' %}"><i class="fas fa-chart-bar"></i> Dashboard</a>
-                    </div>
-                </li>
-            </ul>
-        </div>
-    </div>
-</div>
-
-
-
-<div class="menu-group">
-    <div class="menu-title"><i class="fas fa-chair"></i> Tables</div>
-    <div class="panel">
-        <div class="panel-header">
-            <div class="panel-title">Tables</div>
-            <button class="action-button btn-secondary"><i class="fas fa-eye"></i> View All</button>
-        </div>
-        <div class="panel-content">
-            <ul class="model-list">
-                <li class="model-item">
-                    <span class="model-name">Tables</span>
-                    <div class="model-actions">
-                        <a href="{% url 'table_add' %}"><i class="fas fa-plus"></i> Add</a>
-                        <a href="{% url 'table_list' %}"><i class="fas fa-edit"></i> Modify</a>
-                        <a href="{% url 'table_list' %}"><i class="fas fa-trash"></i> Delete</a>
-                        <a href="{% url 'table_inquiry' %}"><i class="fas fa-search"></i> Inquiry</a>
-                        <a href="{% url 'table_dashboard' %}"><i class="fas fa-chart-bar"></i> Dashboard</a>
-                    </div>
-                </li>
-            </ul>
-        </div>
-    </div>
-</div>
-
-<div class="menu-group">
-    <div class="menu-title"><i class="fas fa-car"></i> Vehicles</div>
-    <div class="panel">
-        <div class="panel-header">
-            <div class="panel-title">Vehicles</div>
-            <button class="action-button btn-secondary"><i class="fas fa-eye"></i> View All</button>
-        </div>
-        <div class="panel-content">
-            <ul class="model-list">
-                <li class="model-item">
-                    <span class="model-name">Vehicles</span>
-                    <div class="model-actions">
-                        <a href="{% url 'vehicle_add' %}"><i class="fas fa-plus"></i> Add</a>
-                        <a href="{% url 'vehicle_list' %}"><i class="fas fa-edit"></i> Modify</a>
-                        <a href="{% url 'vehicle_list' %}"><i class="fas fa-trash"></i> Delete</a>
-                        <a href="{% url 'vehicle_inquiry' %}"><i class="fas fa-search"></i> Inquiry</a>
-                        <a href="{% url 'vehicle_dashboard' %}"><i class="fas fa-chart-bar"></i> Dashboard</a>
-                    </div>
-                </li>
-            </ul>
-        </div>
-    </div>
-</div>
-
-            
+            <div class="menu-title"><i class="fas fa-building"></i> Rooms</div>
             <div class="panel">
                 <div class="panel-header">
-                    <div class="panel-title"><i class="fas fa-info-circle"></i> Business Unit Details</div>
+                    <div class="panel-title"><i class="fas fa-door-open"></i> Rooms</div>
+                    <button class="action-button btn-secondary"><a href="{% url 'room_inquiry' %}"><i class="fas fa-eye"></i> View All</a></button>
                 </div>
                 <div class="panel-content">
-                    <div class="business-details">
-                        <p><strong>SAAS Customer:</strong> {{ saas_customer.saas_customer_name }}</p>
-                        <p><strong>Business Unit Group:</strong> {{ business_unit_group.business_unit_group_name }}</p>
-                        <p><strong>Business Unit:</strong> {{ business_unit.business_unit_name }}</p>
-                        <p><strong>Branch:</strong> {{ branch.branch_name }}</p>
-                    </div>
+                    <ul class="model-list">
+                        <li class="model-item">
+                            <span class="model-name">Rooms</span>
+                            <div class="model-actions">
+                                <a href="{% url 'room_add' %}"><i class="fas fa-plus"></i> Add</a>
+                                <a href="{% url 'room_list' %}"><i class="fas fa-edit"></i> Modify</a>
+                                <a href="{% url 'room_list' %}"><i class="fas fa-trash"></i> Delete</a>
+                                <a href="{% url 'room_inquiry' %}"><i class="fas fa-search"></i> Inquiry</a>
+                                <a href="{% url 'room_dashboard' %}"><i class="fas fa-chart-bar"></i> Dashboard</a>
+                            </div>
+                        </li>
+                    </ul>
                 </div>
             </div>
         </div>
 
-
-        <div class="right-column">
-          
+        <div class="menu-group">
+            <div class="menu-title"><i class="fas fa-chair"></i> Tables</div>
             <div class="panel">
                 <div class="panel-header">
-                    <div class="panel-title"><i class="fas fa-chart-pie"></i> Quick Stats</div>
+                    <div class="panel-title"><i class="fas fa-table"></i> Tables</div>
+                    <button class="action-button btn-secondary"><a href="{% url 'table_inquiry' %}"><i class="fas fa-eye"></i> View All</a></button>
                 </div>
                 <div class="panel-content">
-                    <div class="stats-box stats-green">
-                        <h4>Products</h4>
-                        <p>{{ products_count|default:"0" }}</p>
-                    </div>
-                    <div class="stats-box stats-blue">
-                        <h4>Customers</h4>
-                        <p>{{ customers_count|default:"0" }}</p>
-                    </div>
+                    <ul class="model-list">
+                        <li class="model-item">
+                            <span class="model-name">Tables</span>
+                            <div class="model-actions">
+                                <a href="{% url 'table_add' %}"><i class="fas fa-plus"></i> Add</a>
+                                <a href="{% url 'table_list' %}"><i class="fas fa-edit"></i> Modify</a>
+                                <a href="{% url 'table_list' %}"><i class="fas fa-trash"></i> Delete</a>
+                                <a href="{% url 'table_inquiry' %}"><i class="fas fa-search"></i> Inquiry</a>
+                                <a href="{% url 'table_dashboard' %}"><i class="fas fa-chart-bar"></i> Dashboard</a>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="menu-group">
+            <div class="menu-title"><i class="fas fa-car"></i> Vehicles</div>
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title"><i class="fas fa-car-side"></i> Vehicles</div>
+                    <button class="action-button btn-secondary"><a href="{% url 'vehicle_inquiry' %}"><i class="fas fa-eye"></i> View All</a></button>
+                </div>
+                <div class="panel-content">
+                    <ul class="model-list">
+                        <li class="model-item">
+                            <span class="model-name">Vehicles</span>
+                            <div class="model-actions">
+                                <a href="{% url 'vehicle_add' %}"><i class="fas fa-plus"></i> Add</a>
+                                <a href="{% url 'vehicle_list' %}"><i class="fas fa-edit"></i> Modify</a>
+                                <a href="{% url 'vehicle_list' %}"><i class="fas fa-trash"></i> Delete</a>
+                                <a href="{% url 'vehicle_inquiry' %}"><i class="fas fa-search"></i> Inquiry</a>
+                                <a href="{% url 'vehicle_dashboard' %}"><i class="fas fa-chart-bar"></i> Dashboard</a>
+                            </div>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title"><i class="fas fa-info-circle"></i> Business Unit Details</div>
+            </div>
+            <div class="panel-content">
+                <div class="business-details">
+                    <p><strong>SAAS Customer:</strong> {{ saas_customer.saas_customer_name }}</p>
+                    <p><strong>Business Unit Group:</strong> {{ business_unit_group.business_unit_group_name }}</p>
+                    <p><strong>Business Unit:</strong> {{ business_unit.business_unit_name }}</p>
+                    <p><strong>Branch:</strong> {{ branch.branch_name }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="right-column">
+        <div class="panel">
+            <div class="panel-header">
+                <div class="panel-title"><i class="fas fa-chart-pie"></i> Quick Stats</div>
+            </div>
+            <div class="panel-content">
+                <div class="stats-box stats-green">
+                    <h4>Products</h4>
+                    <p>{{ products_count|default:"0" }}</p>
+                </div>
+                <div class="stats-box stats-blue">
+                    <h4>Customers</h4>
+                    <p>{{ customers_count|default:"0" }}</p>
+                </div>
+                <div class="panel-content">
                     <div class="stats-box stats-orange">
                         <h4>Suppliers</h4>
                         <p>{{ supplier_count|default:"0" }}</p>
@@ -215,5 +345,6 @@
             </div>
         </div>
     </div>
+</div>
 {% endblock %}
 
