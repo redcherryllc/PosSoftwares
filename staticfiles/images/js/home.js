@@ -487,3 +487,87 @@ function initiatePayment() {
             document.querySelectorAll('.overlay').forEach(overlay => overlay.classList.toggle('active', document.querySelector('.control-panel').classList.contains('active')));
         }    
 
+
+
+
+
+document.addEventListener('DOMContentLoaded', () => {
+    
+    const customerForm = document.querySelector('#customerModal form');
+    if (customerForm) {
+        customerForm.addEventListener('submit', function (e) {
+            e.preventDefault(); 
+
+            const formData = new FormData(this);
+            const addCustomerUrl = document.getElementById('customerModal').dataset.addCustomerUrl || '/add-customer/';
+
+            fetch(addCustomerUrl, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success && data.customer) {
+                   
+                    const customerModalElement = document.getElementById('customerModal');
+                    const customerModal = bootstrap.Modal.getInstance(customerModalElement) || new bootstrap.Modal(customerModalElement);
+                    customerModal.hide();
+
+                    
+                    const customerSelect = document.querySelector('select[name="customer_select"]');
+                    if (customerSelect) {
+                        const newCustomer = data.customer;
+                        const option = document.createElement('option');
+                        option.value = newCustomer.customer_id;
+                        option.textContent = newCustomer.customer_name;
+                        if (newCustomer.customer_name === "Walking Customer") {
+                            option.selected = true;
+                        }
+                        customerSelect.appendChild(option);
+                        customerSelect.value = newCustomer.customer_id;
+
+                        
+                        customerForm.reset();
+                    } else {
+                        console.error('Customer select dropdown not found');
+                    }
+
+                    
+                    alert('Customer added successfully!');
+                } else {
+                    alert('Failed to add customer: ' + (data.error || 'Please check the form fields.'));
+                }
+            })
+            .catch(error => {
+                console.error('Error adding customer:', error);
+                alert('An error occurred while adding the customer. Please try again.');
+            });
+        });
+    } else {
+        console.error('Customer form not found');
+    }
+
+    
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});        
