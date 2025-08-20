@@ -24,6 +24,7 @@ urlpatterns = [
     
     path('', include('pos.urls')),
     
+    
 ]
 
 
