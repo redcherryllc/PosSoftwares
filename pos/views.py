@@ -1321,7 +1321,6 @@ def payment_view(request):
 
 
 
-
 logger = logging.getLogger(__name__)
 
 @login_required
@@ -1333,14 +1332,28 @@ def view_order(request):
         return redirect('home')
 
     try:
+        
         today = timezone.now().date()
+        start_date = request.GET.get('start_date')
+        end_date = request.GET.get('end_date')
 
+       
+        if start_date:
+            start_date = parse_date(start_date)
+        else:
+            start_date = today  
+        if end_date:
+            end_date = parse_date(end_date)
+        else:
+            end_date = today  
+
+        
         unpaid_sales = SalesHeader.objects.filter(
             business_unit_id=business_unit_id,
             payment_status__in=['Unpaid', 'Partially Paid']
         ).filter(
-            Q(payment_status='Unpaid', sale_date=today) |
-            Q(payment_status='Partially Paid', update_dt=today)
+            Q(payment_status='Unpaid', sale_date__gte=start_date, sale_date__lte=end_date) |
+            Q(payment_status='Partially Paid', update_dt__gte=start_date, update_dt__lte=end_date)
         ).select_related('customer', 'business_unit', 'branch', 'table', 'room', 'vehicle')\
          .annotate(total_items=Count('salesline'))\
          .annotate(
@@ -1391,15 +1404,16 @@ def view_order(request):
 
         context = {
             'unpaid_sales': unpaid_sales,
+            'start_date': start_date,
+            'end_date': end_date,
         }
-        logger.debug(f"View Order: Context sent to view_order.html: unpaid_sales={sales_data}, updated_sale_nos={updated_sale_nos}")
+        logger.debug(f"View Order: Context sent to view_order.html: unpaid_sales={sales_data}, updated_sale_nos={updated_sale_nos}, start_date={start_date}, end_date={end_date}")
         return render(request, 'view_order.html', context)
 
     except Exception as e:
         logger.error(f"Error in view_order: {str(e)}")
         messages.error(request, f"Error: {str(e)}")
         return redirect('home')
-
 
 
 
