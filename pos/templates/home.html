@@ -110,38 +110,45 @@
                 <button onclick="completeSale()">OK</button>
             </div>
         </div>
+
         <div class="pos-grid">
-            <div class="pos-grid-label">PRODUCT OR MENU LIST</div>
-            <div class="pos-items" id="posGrid">
-                {% if products %}
-                    {% for product in products %}
-                        <div class="pos-item" onclick="addItemToSale('{{ product.product_id }}', '{{ product.product_name|escapejs }}', {{ product.sale_price }})">
-                            <img src="{{ product.product_image.url|default:'/static/images/default.png' }}" alt="{{ product.product_name|escape }}" loading="lazy" onerror="this.src='/static/images/default.png'">
-                            <p>{{ product.product_name }}</p>
-                            <p>Cost: {{ product.sale_price }}</p>
-                        </div>
-                    {% endfor %}
+    <div class="pos-grid-label">PRODUCT OR MENU LIST</div>
+    <div class="pos-items" id="posGrid">
+        {% if products %}
+            {% for product in products %}
+                <div class="pos-item" onclick="addItemToSale('{{ product.product_id }}', '{{ product.product_name|escapejs }}', {{ product.sale_price }})">
+                    {% if product.product_image %}
+                        <img src="{{ product.product_image.url }}" alt="{{ product.product_name|escape }}" loading="lazy">
+                    {% else %}
+                        <div class="no-image-placeholder"></div>
+                    {% endif %}
+                    <p>{{ product.product_name }}</p>
+                    <p>Cost: {{ product.sale_price }}</p>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p>No products available.</p>
+        {% endif %}
+    </div>
+</div>
+<div class="control-panel">
+    <div class="button-group">
+        {% for group in product_groups %}
+            <button class="control-button" onclick="filterItems('{{ group.product_group_id }}')">
+                {% if group.product_image %}
+                    <img src="{{ group.product_image.url }}" alt="{{ group.product_name|escape }}" style="max-width: 50px; height: auto;">
                 {% else %}
-                    <p>No products available.</p>
+                    <div class="no-image-placeholder"></div>
                 {% endif %}
-            </div>
-        </div>
-        <div class="control-panel">
-            <div class="button-group">
-                {% for group in product_groups %}
-                    <button class="control-button" onclick="filterItems('{{ group.product_group_id }}')">
-                        {% if group.product_image %}
-                            <img src="{{ group.product_image.url }}" alt="{{ group.product_name|escape }}" style="max-width: 50px; height: auto;" onerror="this.src='/static/images/default.png'">
-                        {% else %}
-                            <img src="{% static 'images/default.png' %}" alt="No image" style="max-width: 50px; height: auto;">
-                        {% endif %}<br>
-                        {{ group.product_name }}
-                    </button>
-                {% empty %}
-                    <p>No product groups available.</p>
-                {% endfor %}
-            </div>
-        </div>
+                <br>
+                {{ group.product_name }}
+            </button>
+        {% empty %}
+            <p>No product groups available.</p>
+        {% endfor %}
+    </div>
+</div>
+
     </div>
     <div class="overlay"></div>
     <div class="bottom-bar">
