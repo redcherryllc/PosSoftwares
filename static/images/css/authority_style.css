@@ -1,0 +1,254 @@
+.container {
+    max-width: 1000px;
+    margin: 20px auto;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+}
+
+.page-header {
+    background: #5faafb;
+    color: white;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
+.page-title {
+    margin: 0;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.header-info {
+    display: flex;
+    gap: 15px;
+    font-size: 14px;
+    margin-top: 10px;
+}
+
+.messages {
+    margin-bottom: 20px;
+}
+
+.messages p {
+    padding: 10px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.messages .success {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.messages .error {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.user-section {
+    background: #f1f3f5;
+    padding: 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
+.user-toggle {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.toggle-btn {
+    padding: 8px 12px;
+    border: 1px solid #ced4da;
+    background: #fff;
+    cursor: pointer;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+.toggle-btn.active {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.user-selection, .add-user-section {
+    margin-bottom: 15px;
+}
+
+.user-selection label, .add-user-section label {
+    font-weight: bold;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.user-selection select, .add-user-section select {
+    width: 100%;
+    max-width: 300px;
+    padding: 8px;
+    border: 1px solid #ced4da;
+    border-radius: 5px;
+    font-size: 14px;
+}
+
+.user-selection select:focus, .add-user-section select:focus {
+    border-color: #007bff;
+    outline: none;
+}
+
+.btn-add, .btn-clear {
+    padding: 8px 12px;
+    border: none;
+    border-radius: 5px;
+    font-size: 14px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.btn-add {
+    background: #28a745;
+    color: white;
+}
+
+.btn-add:hover {
+    background: #218838;
+}
+
+.btn-clear {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-clear:hover {
+    background: #c82333;
+}
+
+.authority-header {
+    background: #343a40;
+    color: white;
+    padding: 10px;
+    border-radius: 5px 5px 0 0;
+    font-size: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.tables-container {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.authority-table-container {
+    flex: 2;
+}
+
+.new-access-section {
+    flex: 1;
+    background: #e9ecef;
+    border-radius: 5px;
+}
+
+.new-access-header {
+    background: #007bff;
+    color: white;
+    padding: 10px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.table-wrapper {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.authority-table, .new-access-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+}
+
+.authority-table th, .authority-table td,
+.new-access-table th, .new-access-table td {
+    padding: 10px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.authority-table th, .new-access-table th {
+    background: #f8f9fa;
+    font-weight: bold;
+    position: sticky;
+    top: 0;
+}
+
+.checkbox-cell {
+    text-align: center;
+    width: 60px;
+}
+
+.btn-container {
+    display: flex;
+    gap: 10px;
+}
+
+.btn-primary, .cancel-link {
+    padding: 10px 20px;
+    border-radius: 5px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: #007bff;
+    color: white;
+    border: none;
+}
+
+.btn-primary:hover {
+    background: #0056b3;
+}
+
+.cancel-link {
+    background: #6c757d;
+    color: white;
+}
+
+.cancel-link:hover {
+    background: #5a6268;
+}
+
+@media (max-width: 768px) {
+    .tables-container {
+        flex-direction: column;
+    }
+
+    .authority-table-container, .new-access-section {
+        width: 100%;
+    }
+
+    .header-info {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .btn-container {
+        flex-direction: column;
+    }
+
+    .btn-primary, .cancel-link {
+        width: 100%;
+    }
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}

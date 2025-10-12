@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1 class="page-title">Manage User Permissions</h1>
+        <div class="header-info">
+    
+           <div>Login By: {{ username }}</div>
+         
+            <div>Connected to: Live Server</div>
+        </div>
+    </div>
+
+    <a href="{% url 'saasuser_add' %}" class="btn-primary" style="float: right; background-color: #0bc4f7ff; border-color: #59a2d6ff; color: #000000ff;">
+    <i class="fas fa-user-plus"></i> Add New User
+</a>
+
+
+
+    {% if messages %}
+        <div class="messages">
+            {% for message in messages %}
+                <p class="{{ message.tags }}">
+                    {% if message.tags == 'error' %}
+                        <i class="fas fa-exclamation-circle"></i>
+                    {% elif message.tags == 'success' %}
+                        <i class="fas fa-check-circle"></i>
+                    {% endif %}
+                    {{ message }}
+                </p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    
+    <div class="user-section">
+        <div class="user-toggle">
+            <button class="toggle-btn active" data-target="select-user">Select User</button>
+            <button class="toggle-btn" data-target="add-user">Add New User</button>
+        </div>
+
+        
+        <div class="user-selection" id="select-user" style="display: block;">
+            <label for="{{ saas_user_form.saas_username.id_for_label }}">Choose a User:</label>
+            {{ saas_user_form.saas_username }}
+            <button type="button" class="btn-clear" id="clear-selection">Clear</button>
+        </div>
+
+        
+        <form method="POST" class="add-user-form" id="add-user" style="display: none;">
+            {% csrf_token %}
+            <div class="add-user-section">
+                <label for="{{ saas_user_form.add_new_user.id_for_label }}">Enter New User:</label>
+                {{ saas_user_form.add_new_user }}
+                <button type="submit" name="add_new_user_submit" value="1" class="btn-add">Add User</button>
+            </div>
+        </form>
+    </div>
+
+    <form method="POST" id="authorityForm">
+        {% csrf_token %}
+        <input type="hidden" name="user_id" id="form-user-id" value="{% if selected_user %}{{ selected_user.saas_user_id }}{% endif %}">
+        <input type="hidden" name="authority_submit" value="1">
+        
+        <div class="authority-header">
+            Selected User: <span id="current-user-id">{% if selected_user %}{{ selected_user.saas_user_id }} - {{ selected_user.saas_username }}{% else %}None{% endif %}</span>
+            <label style="float: right;">
+                <input type="checkbox" id="select-all"> Select All
+            </label>
+        </div>
+        
+        <div class="tables-container">
+            <div class="authority-table-container">
+                <div class="table-wrapper">
+                    <table class="authority-table" id="authority-table">
+                        <thead>
+                            <tr>
+                                <th>Menu</th>
+                                <th>Sub Menu</th>
+                                <th class="checkbox-cell">Access</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for menu_item in menu_items %}
+                            <tr>
+                                <td>{{ menu_item.au_menu }}</td>
+                                <td>{{ menu_item.au_submenu_text }}</td>
+                                <td class="checkbox-cell">
+                                    {% with checkbox_id=forloop.counter %}
+                                    <input type="checkbox" 
+                                           name="selected" 
+                                           value="{{ menu_item.au_menu }}:{{ menu_item.au_submenu }}" 
+                                           class="menu-checkbox" 
+                                           data-menu="{{ menu_item.au_menu }}" 
+                                           data-submenu="{{ menu_item.au_submenu }}"
+                                           data-original="0"
+                                           id="checkbox-{{ checkbox_id }}">
+                                    {% endwith %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="new-access-section" style="display: none;">
+                <div class="new-access-header">New Permissions</div>
+                <div class="table-wrapper">
+                    <table class="new-access-table" id="new-access-table">
+                        <thead>
+                            <tr>
+                                <th>Menu</th>
+                                <th>Sub Menu</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                          
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="btn-container">
+            <button type="submit" class="btn-primary">
+                <i class="fas fa-save"></i> Save Permissions
+            </button>
+            <a href="{% url 'authority_list' %}" class="cancel-link">
+                <i class="fas fa-times"></i> Cancel
+            </a>
+        </div>
+    </form>
+</div>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<link rel="stylesheet" href="{% static 'images/css/authority_style.css' %}">
+<script src="{% static 'images/js/authority_script.js' %}"></script>
+
+{% endblock %}

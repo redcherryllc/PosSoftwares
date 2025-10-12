@@ -10,6 +10,12 @@ from django.shortcuts import render, redirect
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+from django.http import Http404  
+from django.urls import reverse
+
+from datetime import datetime
+
+
 
 from .forms import CustomerForm
 from .models import (
@@ -21,7 +27,7 @@ from .models import (
 from django.db.models.functions import Coalesce
 from django.db.models import Sum, Count, Avg, Q, Case, When, DecimalField, ExpressionWrapper, F,FloatField
 from .models import SAASUsers, BusinessUnit, Branch, PurchaseOrders, PurchaseOrderItems, Suppliers
-from .forms import PurchaseOrderForm, PurchaseOrderItemFormSet, StockAdjustmentForm
+from .forms import PurchaseOrderForm, PurchaseOrderItemFormSet, StockAdjustmentForm, RegistrationForm, AuthorityForm
 import logging
 
 from datetime import timedelta
@@ -49,8 +55,16 @@ from django.db.models.functions import Cast, Substr
 from django.contrib.auth import logout
 
 from .forms import SAASUsersForm, CategoryForm, BusinessUnitGroupForm, BusinessUnitForm, BranchForm, WarehouseForm, CustomerForm
-
+from .forms import AuthorityForm, SAASUserForm
 from django.db.models import Max
+
+from .models import BusinessUnit, SAASUsers, Customer, Registration, Authority        
+from django.utils import timezone
+import pytz
+import datetime
+
+
+
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +86,44 @@ def login_required(view_func):
         
         return view_func(request, *args, **kwargs)
     return wrapper
+
+def get_allowed_menu_items(saas_username, business_unit_id):
+    """Helper function to get allowed menu items for the sidebar."""
+    allowed_menus = Authority.objects.filter(
+        business_unit_id=business_unit_id,
+        saas_username=saas_username,
+        au_status='TRUE'
+    ).values('au_menu', 'au_submenu', 'au_menu_text', 'au_submenu_text')
+
+    menu_url_mapping = {
+        'PRODUCT_SALES': {'url': 'product_sales_report', 'icon': 'fa-shopping-cart', 'text': 'Product Sales'},
+        'SALES_BYCUSTOMER': {'url': 'sales_by_customer_report', 'icon': 'fa-chart-line', 'text': 'Sales by Customer'},
+        'SALE_INQUIRY': {'url': 'sale_inquiry', 'icon': 'fa-search-dollar', 'text': 'Sale Inquiry'},
+        'CREATE_PO': {'url': 'po_creation', 'icon': 'fa-file-signature', 'text': 'Create PO'},
+        'PURCHASE_BYSUPPLIER': {'url': 'purchase_by_supplier_report', 'icon': 'fa-truck-loading', 'text': 'Purchase by Supplier'},
+        'CUSTOMER_BILLS': {'url': 'customer_bills', 'icon': 'fa-receipt', 'text': 'Customer Bills'},
+        'CUSTOMER_Summary': {'url': 'customer_summary', 'icon': 'fa-users-cog', 'text': 'Customer Summary'},
+        'AUTHORITY': {'url': 'admin_view', 'icon': 'fa-user-shield', 'text': 'Admin'},
+        'GENERAL_LEDGER': {'url': 'general_ledger_report', 'icon': 'fa-file-invoice', 'text': 'General Ledger'},
+        'LEDGER': {'url': 'expense_entry', 'icon': 'fa-book-open', 'text': 'Ledger'},
+        'TRIAL_BALANCE': {'url': 'trial_balance_report', 'icon': 'fa-balance-scale-right', 'text': 'Trial Balance'},
+        'BALANCE_SHEET': {'url': 'balance_sheet', 'icon': 'fa-file-contract', 'text': 'Balance Sheet'},
+        'INCOME_STATEMENT': {'url': 'income_statement', 'icon': 'fa-chart-bar', 'text': 'Income Statement'},
+        'INVENTORY_VALUATION': {'url': 'inventory_valuation_report', 'icon': 'fa-boxes', 'text': 'Inventory Valuation'},
+        'PO_INQUIRY': {'url': 'po_inquiry', 'icon': 'fa-search', 'text': 'PO Inquiry'},
+        'STOCK_ADJUSTMENT': {'url': 'stock_adjustment', 'icon': 'fa-tools', 'text': 'Stock Adjustment'},
+        'STOCK_RETURN': {'url': 'stock_return', 'icon': 'fa-undo', 'text': 'Stock Return'},
+        'STOCK_REPORT_LIST': {'url': 'stock_report_list', 'icon': 'fa-clipboard-list', 'text': 'Stock Report List'},
+    }
+
+    return [
+        {
+            'url_name': menu_url_mapping.get(menu['au_submenu'], {}).get('url', '#'),
+            'icon': menu_url_mapping.get(menu['au_submenu'], {}).get('icon', 'fa-circle'),
+            'text': menu_url_mapping.get(menu['au_submenu'], {}).get('text', menu['au_submenu_text'])
+        }
+        for menu in allowed_menus
+    ]
 
 def get_business_unit_groups(request):
     saas_customer_id = request.GET.get('saas_customer_id')
@@ -104,7 +156,7 @@ def get_branches(request):
     if business_unit_id:
         try:
             branches = Branch.objects.filter(business_unit_id=business_unit_id)
-            data = [{'branch_id': branch.branch_id, 'branch_name': branch.branch_name}
+            data = [{'branch_id': branch.branch_id, 'business_unit_id': branch.business_unit_id, 'branch_name': branch.branch_name}
                     for branch in branches]
             return JsonResponse(data, safe=False)
         except Exception as e:
@@ -124,6 +176,7 @@ def login_view(request):
                     saas_user_password=password  
                 )
                 request.session['temp_saas_user_id'] = user.saas_user_id
+                request.session['saas_username'] = user.saas_username
                 request.session.modified = True  
                 business_units = BusinessUnit.objects.filter(
                     business_unit_group__saas_customer=user.saas_customer
@@ -162,6 +215,7 @@ def login_view(request):
                 if (business_unit in user_business_units and
                     branch.business_unit == business_unit):
                     request.session['saas_user_id'] = user.saas_user_id
+                    request.session['saas_username'] = user.saas_username
                     request.session['saas_customer_id'] = user.saas_customer.saas_customer_id
                     request.session['business_unit_group_id'] = business_unit.business_unit_group.business_unit_group_id
                     request.session['business_unit_id'] = business_unit.business_unit_id
@@ -181,10 +235,197 @@ def login_view(request):
     return render(request, 'login.html')
 
 
+def admin_view(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+    selected_room_id = request.session.get('selected_room_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
+        if request.method == 'POST' and 'room_id' in request.POST:
+            selected_room_id = request.POST.get('room_id')
+            request.session['selected_room_id'] = selected_room_id
+            request.session.modified = True
+            return redirect('home')
+
+        products_count = Products.objects.filter(business_unit=business_unit).count()
+        customers_count = Customer.objects.filter(business_unit=business_unit).count()
+        supplier_count = Suppliers.objects.filter(business_unit=business_unit).count()
+        total_rooms = Rooms.objects.filter(business_unit=business_unit).count()
+
+        booked_not_confirmed_qs = Registration.objects.filter(
+            business_unit_id=business_unit_id,
+            booking_status='00'
+        ).select_related('room', 'customer')
+        booked_not_confirmed = booked_not_confirmed_qs.count()
+
+        confirmed_rooms_qs = Registration.objects.filter(
+            business_unit_id=business_unit_id,
+            booking_status='10'
+        ).select_related('room', 'customer')
+        confirmed_rooms = confirmed_rooms_qs.count()
+
+        occupied_rooms_qs = Registration.objects.filter(
+            business_unit_id=business_unit_id,
+            booking_status='20'
+        ).select_related('room', 'customer')
+        occupied_rooms = occupied_rooms_qs.count()
+
+        cancelled_rooms_qs = Registration.objects.filter(
+            business_unit_id=business_unit_id,
+            booking_status='40'
+        ).select_related('room', 'customer')
+        cancelled_rooms = cancelled_rooms_qs.count()
+
+        released_rooms_qs = Registration.objects.filter(
+            business_unit_id=business_unit_id,
+            booking_status='50'
+        ).select_related('room', 'customer')
+        released_rooms = released_rooms_qs.count()
+
+       
+        active_bookings = Registration.objects.filter(
+            business_unit_id=business_unit_id,
+            booking_status__in=['00', '10', '20']
+        )
+        booked_room_ids = active_bookings.values_list('room__room_id', flat=True)
+        available_rooms_qs = Rooms.objects.filter(business_unit=business_unit).exclude(room_id__in=booked_room_ids)
+        available_rooms = available_rooms_qs.count()
+
+        available_rooms_list = [
+            {
+                'room_id': room.room_id,
+                'room_name': room.room_name,
+                'room_location': room.location
+            } for room in available_rooms_qs
+        ]
+
+        booked_not_confirmed_list = [
+            {
+                'booking_id': reg.pk,  
+                'room_id': reg.room.room_id,
+                'room_name': reg.room.room_name,
+                'room_location': reg.room.location or 'N/A',
+                'customer_name': reg.customer.customer_name if reg.customer else 'N/A',
+                'start_dt': reg.start_dt,
+                'end_dt': reg.end_dt,
+                'booking_status': reg.booking_status
+            } for reg in booked_not_confirmed_qs
+        ]
+
+        confirmed_rooms_list = [
+            {
+                'booking_id': reg.pk,
+                'room_id': reg.room.room_id,
+                'room_name': reg.room.room_name,
+                'room_location': reg.room.location or 'N/A',
+                'customer_name': reg.customer.customer_name if reg.customer else 'N/A',
+                'start_dt': reg.start_dt,
+                'end_dt': reg.end_dt,
+                'booking_status': reg.booking_status
+            } for reg in confirmed_rooms_qs
+        ]
+
+        occupied_rooms_list = [
+            {
+                'booking_id': reg.pk,
+                'room_id': reg.room.room_id,
+                'room_name': reg.room.room_name,
+                'room_location': reg.room.location or 'N/A',
+                'customer_name': reg.customer.customer_name if reg.customer else 'N/A',
+                'start_dt': reg.start_dt,
+                'end_dt': reg.end_dt,
+                'booking_status': reg.booking_status
+            } for reg in occupied_rooms_qs
+        ]
+
+        cancelled_rooms_list = [
+            {
+                'booking_id': reg.pk,
+                'room_id': reg.room.room_id,
+                'room_name': reg.room.room_name,
+                'room_location': reg.room.location or 'N/A',
+                'customer_name': reg.customer.customer_name if reg.customer else 'N/A',
+                'start_dt': reg.start_dt,
+                'end_dt': reg.end_dt,
+                'booking_status': reg.booking_status
+            } for reg in cancelled_rooms_qs
+        ]
+
+        released_rooms_list = [
+            {
+                'booking_id': reg.pk,
+                'room_id': reg.room.room_id,
+                'room_name': reg.room.room_name,
+                'room_location': reg.room.location or 'N/A',
+                'customer_name': reg.customer.customer_name if reg.customer else 'N/A',
+                'start_dt': reg.start_dt,
+                'end_dt': reg.end_dt,
+                'booking_status': reg.booking_status
+            } for reg in released_rooms_qs
+        ]
+
+        selected_room = None
+        if selected_room_id:
+            try:
+                selected_room = Rooms.objects.get(room_id=selected_room_id, business_unit=business_unit)
+            except Rooms.DoesNotExist:
+                selected_room_id = None
+                request.session.pop('selected_room_id', None)
+                request.session.modified = True
+
+        context = {
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'allowed_menu_items': allowed_menu_items,
+            'products_count': products_count,
+            'customers_count': customers_count,
+            'supplier_count': supplier_count,
+            'total_rooms': total_rooms,
+            'available_rooms': available_rooms,
+            'booked_not_confirmed': booked_not_confirmed,
+            'confirmed_rooms': confirmed_rooms,
+            'occupied_rooms': occupied_rooms,
+            'cancelled_rooms': cancelled_rooms,
+            'released_rooms': released_rooms,
+            'available_rooms_list': available_rooms_list,
+            'booked_not_confirmed_list': booked_not_confirmed_list,
+            'confirmed_rooms_list': confirmed_rooms_list,
+            'occupied_rooms_list': occupied_rooms_list,
+            'cancelled_rooms_list': cancelled_rooms_list,
+            'released_rooms_list': released_rooms_list,
+            'app_label': 'pos',
+            'allowed_menu_items': allowed_menu_items,
+            'selected_room_id': selected_room_id,
+            'selected_room': selected_room,
+            'rooms': Rooms.objects.filter(business_unit=business_unit),
+        }
+        return render(request, 'admin.html', context)
+    except Exception as e:
+        logger.error(f"Error in admin_view: {str(e)}")
+        messages.error(request, f"Error: {str(e)}")
+        return redirect('login')
+
+
 
 @login_required
-def home_view(request):
+def registration_add(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -197,47 +438,395 @@ def home_view(request):
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
 
-        product_groups = ProductGroup.objects.filter(business_unit=business_unit)
-        products = Products.objects.filter(business_unit=business_unit)
-        tables = Tables.objects.filter(business_unit=business_unit)
-        rooms = Rooms.objects.filter(business_unit=business_unit)
-        vehicles = Vehicle.objects.filter(business_unit=business_unit)
-        customers = Customer.objects.filter(business_unit=business_unit)
-        customer_form = CustomerForm()
-  
-        today = timezone.now().date()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('login')
+    except SAASUsers.DoesNotExist:
+        messages.error(request, "Invalid user session.")
+        return redirect('login')
+
+    customer_form = CustomerForm(business_unit=business_unit)
+    registration_form = RegistrationForm(business_unit=business_unit)
+
+    if request.method == 'POST':
+        if 'customer_submit' in request.POST:
+            customer_form = CustomerForm(request.POST, business_unit=business_unit)
+            if customer_form.is_valid():
+                customer = customer_form.save(commit=False)
+                customer.business_unit = business_unit
+                customer.create_by = saas_user.saas_username[:10]
+                current_date = timezone.now().date()
+                customer.create_remarks = f"Customer created by {saas_user.saas_username[:10]} on {current_date}"
+                
+               
+                customer.update_dt = timezone.datetime(1900, 1, 1).date()
+                customer.update_tm = timezone.make_aware(
+                    timezone.datetime(1900, 1, 1, 0, 0, 0), 
+                    timezone=pytz.UTC
+                )
+                customer.update_by = ''
+                customer.update_marks = ''
+                
+                customer.save()
+                
+                return JsonResponse({
+                    'status': 'success',
+                    'customer_id': customer.pk,
+                    'customer_name': customer.customer_name,
+                    'customer_phone': customer.phone_1 or ''
+                })
+            else:
+                return JsonResponse({
+                    'status': 'error',
+                    'errors': customer_form.errors.as_json()
+                })
         
-      
-        today_sales_count = SalesHeader.objects.filter(
-            business_unit_id=business_unit_id,
-            sale_date=today
-        ).count()
+        elif 'registration_submit' in request.POST:
+            registration_form = RegistrationForm(request.POST, business_unit=business_unit)
+            if registration_form.is_valid():
+                registration = registration_form.save(commit=False)
+                registration.business_unit = business_unit
+                registration.create_by = saas_user.saas_username[:10]
+                current_date = timezone.now().date()
+                registration.create_dt = current_date
+                registration.create_remarks = f"Registration created by {saas_user.saas_username[:10]} on {current_date}"
+                registration.update_dt = timezone.datetime(1900, 1, 1).date()
+                registration.update_tm = timezone.make_aware(
+                    timezone.datetime(1900, 1, 1, 0, 0, 0), 
+                    timezone=pytz.UTC
+                )
+                registration.update_by = ''
+                registration.update_remarks = ''
+                registration.booking_dt = current_date
+                registration.booking_status = '00'
+                registration.save()
+
+                return JsonResponse({
+                    'status': 'success',
+                    'registration_id': registration.pk,
+                    'customer_id': registration.customer.pk if registration.customer else None,
+                    'redirect': reverse('room_dashboard')
+                })
+            else:
+                return JsonResponse({
+                    'status': 'error',
+                    'errors': registration_form.errors.as_json()
+                })
+
+    
+    if request.GET.get('action') == 'search_customer':
+        query = request.GET.get('q', '')
+        customers = Customer.objects.filter(
+            business_unit_id=business_unit_id
+        ).filter(
+            Q(customer_name__icontains=query) |
+            Q(phone_1__icontains=query) |
+            Q(aadhaar_card_no__icontains=query)
+        )[:5]
         
-        date_str = today.strftime('%Y%m%d')
-        next_seq_num = str(today_sales_count + 1).zfill(3)
-        next_sale_no = f"{date_str}{next_seq_num}"
+        customer_data = [
+            {
+                'id': c.pk,
+                'name': c.customer_name,
+                'phone': c.phone_1 or '',
+                'aadhaar': c.aadhaar_card_no or 'N/A'
+            } for c in customers
+        ]
+        return JsonResponse({
+            'status': 'success',
+            'customers': customer_data
+        })
+
+    context = {
+        'username': user.saas_username,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'allowed_menu_items': allowed_menu_items,
+        'customer_form': customer_form,
+        'registration_form': registration_form,
+        'app_label': 'pos',
+    }
+    return render(request, 'registration_add.html', context)
+
+
+
+
+logger = logging.getLogger(__name__)
+
+@login_required
+def registration_edit(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    if not all([saas_user_id, saas_username, saas_customer_id, business_unit_group_id, business_unit_id, branch_id]):
+        logger.error(f"Missing session data: saas_user_id={saas_user_id}, saas_username={saas_username}, "
+                     f"saas_customer_id={saas_customer_id}, business_unit_group_id={business_unit_group_id}, "
+                     f"business_unit_id={business_unit_id}, branch_id={branch_id}")
+        messages.error(request, "Invalid session data. Please log in again.")
+        return redirect('login')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        registration = get_object_or_404(Registration, pk=pk, business_unit_id=business_unit_id)
+
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+
+        if request.method == 'POST':
+            form = RegistrationForm(request.POST, instance=registration, business_unit=business_unit)
+            if form.is_valid():
+                registration = form.save(commit=False)
+                changed_fields = []
+                field_display_names = {
+                    'business_unit': 'Business Unit',
+                    'booking_id': 'Booking ID',
+                    'customer': 'Customer',
+                    'phone1': 'Phone 1',
+                    'booking_agent_code': 'Booking Agent Code',
+                    'booking_agent_dt': 'Booking Agent Date',
+                    'booking_agent_ref_no': 'Booking Agent Reference No',
+                    'start_dt': 'Start Date',
+                    'end_dt': 'End Date',
+                    'start_tm': 'Start Time',
+                    'end_tm': 'End Time',
+                    'room': 'Room',
+                    'no_of_rooms': 'Number of Rooms',
+                    'no_of_guest': 'Number of Guests',
+                    'unit_price': 'Unit Price',
+                    'booking_dt': 'Booking Date',
+                    'booking_status': 'Booking Status',
+                }
+                for field in form.changed_data:
+                    changed_fields.append(field_display_names.get(field, field))
+                registration.update_dt = timezone.now().date()
+                registration.update_tm = timezone.now()
+                registration.update_by = saas_user.saas_username[:10]
+                registration.update_remarks = (
+                    f"Updated on {timezone.now().date().strftime('%Y-%m-%d')} by {saas_user.saas_username[:10]}. "
+                    f"Fields changed: {', '.join(changed_fields)}" if changed_fields
+                    else f"Form submitted on {timezone.now().date().strftime('%Y-%m-%d')} by {saas_user.saas_username[:10]} with no field changes"
+                )[:200]
+                registration.save()
+                logger.info(f"Registration updated: {registration.pk}")
+                messages.success(request, "Registration updated successfully.")
+                return redirect('room_dashboard')
+            else:
+                logger.warning(f"Registration form invalid for pk={pk}: {form.errors}")
+                messages.error(request, "Failed to update registration. Please check the form.")
+        else:
+            form = RegistrationForm(instance=registration, business_unit=business_unit)
 
         context = {
+            'form': form,
+            'registration': registration,
             'username': user.saas_username,
             'saas_customer': saas_customer,
             'business_unit_group': business_unit_group,
             'business_unit': business_unit,
             'branch': branch,
-            'product_groups': product_groups,
-            'products': products,
-            'tables': tables,
-            'rooms': rooms,
-            'vehicles': vehicles,
-            'customers': customers,
-            'customer_form': customer_form,
-            'next_sale_no': next_sale_no,
+            'allowed_menu_items': allowed_menu_items,
+            'app_label': 'pos',
         }
-        return render(request, 'home.html', context)
-    except Exception as e:
-        logger.error(f"Error in home_view: {str(e)}")
-        messages.error(request, f"Error: {str(e)}")
+        return render(request, 'registration_edit.html', context)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist,
+            BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in registration_edit: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
         return redirect('login')
 
+@login_required
+def registration_list(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    if not all([saas_user_id, saas_username, saas_customer_id, business_unit_group_id, business_unit_id, branch_id]):
+        logger.error(f"Missing session data: saas_user_id={saas_user_id}, saas_username={saas_username}, "
+                     f"saas_customer_id={saas_customer_id}, business_unit_group_id={business_unit_group_id}, "
+                     f"business_unit_id={business_unit_id}, branch_id={branch_id}")
+        messages.error(request, "Invalid session data. Please log in again.")
+        return redirect('login')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+        registrations = Registration.objects.filter(business_unit_id=business_unit_id).order_by('-create_dt')
+        paginator = Paginator(registrations, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+
+        context = {
+            'page_obj': page_obj,
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'allowed_menu_items': allowed_menu_items,
+            'app_label': 'pos',
+        }
+        return render(request, 'registration_list.html', context)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist,
+            BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in registration_list: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+
+@login_required
+def registration_inquiry(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    if not all([saas_user_id, saas_username, saas_customer_id, business_unit_group_id, business_unit_id, branch_id]):
+        logger.error(f"Missing session data: saas_user_id={saas_user_id}, saas_username={saas_username}, "
+                     f"saas_customer_id={saas_customer_id}, business_unit_group_id={business_unit_group_id}, "
+                     f"business_unit_id={business_unit_id}, branch_id={branch_id}")
+        messages.error(request, "Invalid session data. Please log in again.")
+        return redirect('login')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+        registrations = Registration.objects.filter(business_unit_id=business_unit_id).order_by('-create_dt')
+
+        context = {
+            'registrations': registrations,
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'allowed_menu_items': allowed_menu_items,
+            'app_label': 'pos',
+        }
+        return render(request, 'registration_inquiry.html', context)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist,
+            BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in registration_inquiry: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+
+@login_required
+def registration_delete(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    if not all([saas_user_id, saas_username, saas_customer_id, business_unit_group_id, business_unit_id, branch_id]):
+        logger.error(f"Missing session data: saas_user_id={saas_user_id}, saas_username={saas_username}, "
+                     f"saas_customer_id={saas_customer_id}, business_unit_group_id={business_unit_group_id}, "
+                     f"business_unit_id={business_unit_id}, branch_id={branch_id}")
+        messages.error(request, "Invalid session data. Please log in again.")
+        return redirect('login')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        registration = get_object_or_404(Registration, pk=pk, business_unit_id=business_unit_id)
+
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
+        if request.method == 'POST':
+            registration_id = registration.pk
+            registration.delete()
+            logger.info(f"Registration deleted: {registration_id}")
+            messages.success(request, "Registration deleted successfully.")
+            return redirect('registration_list')
+
+        context = {
+            'object': registration,
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'allowed_menu_items': allowed_menu_items,
+            'app_label': 'pos',
+        }
+        return render(request, 'registration_confirm_delete.html', context)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist,
+            BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in registration_delete: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+
+@login_required
+def update_booking_status(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            booking_id = data.get('booking_id')
+            booking_status = data.get('booking_status')
+            valid_statuses = ['00', '10', '20', '40', '50']
+            if booking_status not in valid_statuses:
+                return JsonResponse({'success': False, 'error': 'Invalid booking status'}, status=400)
+            
+            registration = get_object_or_404(Registration, booking_id=booking_id, business_unit_id=business_unit_id)
+            registration.booking_status = booking_status
+            registration.update_dt = timezone.now().date()
+            registration.update_tm = timezone.now()
+            registration.update_by = saas_username[:10]
+            registration.update_remarks = f"Status updated to {booking_status} on {timezone.now().date()}"
+            registration.save()
+
+            status_names = {
+                '00': 'Booked',
+                '10': 'Confirmed',
+                '20': 'Occupied',
+                '40': 'Cancelled',
+                '50': 'Released'
+            }
+            return JsonResponse({
+                'success': True,
+                'status_name': status_names.get(booking_status, 'Unknown')
+            })
+        except Registration.DoesNotExist:
+            return JsonResponse({'success': False, 'error': 'Booking not found'}, status=400)
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+    return JsonResponse({'success': False, 'error': 'Invalid request method'}, status=400)
 
 @csrf_exempt
 def check_stock(request, product_id):
@@ -326,7 +915,6 @@ def complete_sale(request):
     return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
-logger = logging.getLogger(__name__)
 
 def logout_view(request):
     try:
@@ -338,8 +926,6 @@ def logout_view(request):
     return redirect('login')
 
 
-
-logger = logging.getLogger(__name__)
 
 @login_required
 @require_POST
@@ -362,6 +948,7 @@ def add_customer(request):
                 'customer': {
                     'customer_id': customer.customer_id,
                     'customer_name': customer.customer_name,
+                    'phone_1': customer.phone_1 or ''  # Include phone_1
                 }
             })
         else:
@@ -388,6 +975,8 @@ def expense_entry(request):
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
     branch_id = request.session.get('branch_id')
+    saas_username = request.session.get('saas_username')
+
 
   
     if not all([saas_user_id, saas_customer_id, business_unit_group_id, business_unit_id, branch_id]):
@@ -408,6 +997,7 @@ def expense_entry(request):
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, 
             BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
         logger.error(f"Session data not found: {str(e)}")
@@ -440,6 +1030,7 @@ def expense_entry(request):
         'branch': branch,
         'expense_categories': expense_categories,
         'payment_accounts': payment_accounts,
+        'allowed_menu_items': allowed_menu_items,
     }
 
     if request.method == 'POST':
@@ -611,6 +1202,8 @@ def expense_entry(request):
 @login_required
 def get_sale_details(request):
     sale_id = request.GET.get('sale_id')
+    saas_username = request.session.get('saas_username')
+
     if not sale_id:
         logger.warning("No sale_id provided in get_sale_details")
         return JsonResponse({'success': False, 'error': 'No sale_id provided'})
@@ -667,240 +1260,6 @@ def get_sale_details(request):
     except Exception as e:
         logger.error(f"Error in get_sale_details: {str(e)}")
         return JsonResponse({'success': False, 'error': str(e)})
-
-
-logger = logging.getLogger(__name__)
-
-@csrf_exempt
-@require_POST
-@login_required
-@transaction.atomic
-def save_sale(request):
-    try:
-        
-        saas_user_id = request.session.get('saas_user_id')
-        business_unit_id = request.session.get('business_unit_id')
-        branch_id = request.session.get('branch_id')
-
-        
-        if not all([saas_user_id, business_unit_id, branch_id]):
-            logger.warning("Missing session data: %s", {
-                'saas_user_id': saas_user_id,
-                'business_unit_id': business_unit_id,
-                'branch_id': branch_id
-            })
-            return JsonResponse({'success': False, 'error': 'Incomplete session data. Please log in again.'})
-
-        
-        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
-
-        
-        try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            logger.error("Invalid JSON data in request body")
-            return JsonResponse({'success': False, 'error': 'Invalid request data format.'})
-
-        items = data.get('items', [])
-        customer_id = data.get('customer_id')
-        table_id = data.get('table_id')
-        room_id = data.get('room_id')
-        vehicle_id = data.get('vehicle_id')
-
-        
-        if not items:
-            logger.warning("No items provided for the sale")
-            return JsonResponse({'success': False, 'error': 'No items provided for the sale.'})
-
-        
-        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
-        branch = Branch.objects.get(branch_id=branch_id)
-
-        
-        customer = Customer.objects.get(customer_id=customer_id) if customer_id else None
-        table = Tables.objects.get(table_id=table_id) if table_id else None
-        room = Rooms.objects.get(room_id=room_id) if room_id else None
-        vehicle = Vehicle.objects.get(vehicle_id=vehicle_id) if vehicle_id else None
-
-        
-        default_warehouse = Warehouse.objects.filter(branch=branch).first()
-        if not default_warehouse:
-            logger.error("No warehouse found for branch %s", branch.branch_id)
-            return JsonResponse({'success': False, 'error': 'No warehouse found for this branch.'})
-
-        
-        beverage_groups = ['Water', 'Soft Drinks', 'Beverages', 'Canned Drinks', 'Bottled Water']
-
-        
-        for item in items:
-            try:
-                product = Products.objects.get(product_id=item['id'])
-                is_beverage = False
-                if product.product_group and product.product_group.product_name in beverage_groups:
-                    is_beverage = True
-
-                if is_beverage:
-                    quantity = item.get('quantity', 0)
-                    if not isinstance(quantity, (int, float)) or quantity <= 0:
-                        logger.error("Invalid quantity for product %s: %s", product.product_id, quantity)
-                        return JsonResponse({'success': False, 'error': f"Invalid quantity for product {product.product_name}."})
-                    if product.stock < quantity:
-                        logger.error("Insufficient stock for product %s. Available: %s, Requested: %s",
-                                     product.product_name, product.stock, quantity)
-                        return JsonResponse({
-                            'success': False,
-                            'error': f"Insufficient stock for product {product.product_name}. Available: {product.stock}, Requested: {quantity}"
-                        })
-            except Products.DoesNotExist:
-                logger.error("Product not found: %s", item.get('id'))
-                return JsonResponse({'success': False, 'error': f"Product ID {item.get('id')} not found."})
-            except KeyError as e:
-                logger.error("Missing required item field: %s", str(e))
-                return JsonResponse({'success': False, 'error': f"Missing required field in item: {str(e)}."})
-
-
-        total_amount = 0
-        total_discount = 0
-        total_tax = 0
-        for item in items:
-            price = item.get('price', 0)
-            quantity = item.get('quantity', 0)
-            discount = item.get('discount', 0)
-            tax = item.get('tax', 0)
-
-            if not all(isinstance(x, (int, float)) for x in [price, quantity, discount, tax]):
-                logger.error("Invalid numeric values in item: %s", item)
-                return JsonResponse({'success': False, 'error': 'Invalid numeric values in item data.'})
-
-            base_price = price * quantity
-            discount_amount = base_price * (discount / 100)
-            taxable_amount = base_price - discount_amount
-            tax_amount = taxable_amount * (tax / 100)
-
-            total_amount += taxable_amount + tax_amount
-            total_discount += discount_amount
-            total_tax += tax_amount
-
-        
-        sale_header = SalesHeader.objects.create(
-            business_unit=business_unit,
-            branch=branch,
-            customer=customer,
-            table=table,
-            room=room,
-            vehicle=vehicle,
-            total_amount=total_amount,
-            discount_amount=total_discount,
-            tax=total_tax,
-            tax_amount=total_tax,
-            payment_method='NONE',
-            payment_status='Unpaid',
-            sale_no=f"SALE-{SalesHeader.objects.count() + 1}",
-            create_by=user.saas_username,
-            create_remarks="Created from POS"
-        )
-
-        
-        beverage_items = [
-            item for item in items
-            if Products.objects.get(product_id=item['id']).product_group and
-               Products.objects.get(product_id=item['id']).product_group.product_name in beverage_groups
-        ]
-
-        inventory_header = None
-        if beverage_items:
-            
-            net_value = sum(
-                item['quantity'] * Products.objects.get(product_id=item['id']).unit_cost
-                for item in beverage_items
-            )
-            inventory_header = InventoryHeader.objects.create(
-                business_unit=business_unit,
-                branch=branch,
-                warehouse=default_warehouse,
-                grnno='',  
-                ref_type='SALES',
-                ref_dt=timezone.now().date(),
-                ref_no=sale_header.sale_no,
-                net_value=-net_value, 
-                create_by=user.saas_username,
-                create_remarks=f"Created from sale {sale_header.sale_no}"
-            )
-
-        
-        for item in items:
-            product = Products.objects.get(product_id=item['id'])
-            price = item['price']
-            quantity = item['quantity']
-            discount = item['discount']
-            tax = item['tax']
-
-            base_price = price * quantity
-            discount_amount = base_price * (discount / 100)
-            taxable_amount = base_price - discount_amount
-            tax_amount = taxable_amount * (tax / 100)
-
-            
-            SalesLine.objects.create(
-                sale=sale_header,
-                business_unit=business_unit,
-                branch=branch,
-                customer=customer,
-                product=product,
-                qty=quantity,
-                price=price,
-                total_amount=taxable_amount + tax_amount,
-                discount_amount=discount_amount,
-                tax=tax,
-                tax_amount=tax_amount,
-                create_by=user.saas_username,
-                create_remarks="Created from POS"
-            )
-
-            
-            is_beverage = product.product_group and product.product_group.product_name in beverage_groups
-            if is_beverage:
-                
-                product.stock -= quantity
-                product.save()
-
-                
-                InventoryLine.objects.create(
-                    business_unit=business_unit,
-                    branch=branch,
-                    warehouse=default_warehouse,
-                    inventory=inventory_header,
-                    product=product,
-                    inventory_line_type='SALES',
-                    qty=-quantity,  
-                    price=price,
-                    unit_cost=product.unit_cost,
-                    uom=product.uom,
-                    total_value=quantity * price,
-                    total_cost=quantity * product.unit_cost,
-                    create_by=user.saas_username,
-                    create_remarks=f"Sales transaction for sale {sale_header.sale_no}"
-                )
-
-        logger.info("Sale created successfully: sale_id=%s", sale_header.sale_id)
-        return JsonResponse({'success': True, 'sale_id': sale_header.sale_id})
-
-    except SAASUsers.DoesNotExist:
-        logger.error("User not found: saas_user_id=%s", saas_user_id)
-        return JsonResponse({'success': False, 'error': 'User not found. Please log in again.'})
-    except BusinessUnit.DoesNotExist:
-        logger.error("Business unit not found: business_unit_id=%s", business_unit_id)
-        return JsonResponse({'success': False, 'error': 'Business unit not found.'})
-    except Branch.DoesNotExist:
-        logger.error("Branch not found: branch_id=%s", branch_id)
-        return JsonResponse({'success': False, 'error': 'Branch not found.'})
-    except Customer.DoesNotExist:
-        logger.error("Customer not found: customer_id=%s", customer_id)
-        return JsonResponse({'success': False, 'error': 'Customer not found.'})
-    except Exception as e:
-        logger.error("Error in save_sale: %s", str(e), exc_info=True)
-        return JsonResponse({'success': False, 'error': f"An error occurred: {str(e)}"})
-    
 
 
 
@@ -1321,6 +1680,489 @@ def payment_view(request):
 
 
 
+
+
+
+@login_required
+def get_customers(request):
+    business_unit_id = request.session.get('business_unit_id')
+    try:
+        customers = Customer.objects.filter(business_unit_id=business_unit_id)
+        customer_data = [
+            {
+                'customer_id': c.pk,
+                'customer_name': c.customer_name
+            } for c in customers
+        ]
+        return JsonResponse(customer_data, safe=False)
+    except Exception as e:
+        logger.error(f"Error in get_customers: {str(e)}")
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+@login_required
+def home_view(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+    
+    # Clear selected_room_id if clear_room=1 is in GET or POST
+    clear_room = request.GET.get('clear_room') or request.POST.get('clear_room')
+    if clear_room == '1':
+        request.session.pop('selected_room_id', None)
+        request.session.modified = True
+    
+    selected_room_id = request.session.get('selected_room_id')
+
+    try:
+        if not all([saas_user_id, saas_customer_id, business_unit_group_id, business_unit_id, branch_id]):
+            logger.error("Missing session data: saas_user_id=%s, saas_customer_id=%s, business_unit_group_id=%s, business_unit_id=%s, branch_id=%s",
+                         saas_user_id, saas_customer_id, business_unit_group_id, business_unit_id, branch_id)
+            messages.error(request, "Missing session data. Please log in again.")
+            return redirect('login')
+
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
+        product_groups = ProductGroup.objects.filter(business_unit=business_unit)
+        products = Products.objects.filter(business_unit=business_unit)
+        tables = Tables.objects.filter(business_unit=business_unit)
+        rooms = Rooms.objects.filter(business_unit=business_unit)
+        vehicles = Vehicle.objects.filter(business_unit=business_unit)
+        customers = Customer.objects.filter(business_unit=business_unit)
+        customer_form = CustomerForm(business_unit=business_unit)
+        registration_form = RegistrationForm(business_unit=business_unit)
+
+        # Handle room selection from admin panel (POST request)
+        if request.method == 'POST' and 'room_id' in request.POST:
+            selected_room_id = request.POST.get('room_id')
+            if selected_room_id:  # Only set if a valid room_id is provided
+                request.session['selected_room_id'] = selected_room_id
+            else:
+                request.session.pop('selected_room_id', None)
+            request.session.modified = True
+            return JsonResponse({'status': 'success'})
+
+        # Validate selected_room_id if it exists
+        selected_room = None
+        if selected_room_id:
+            try:
+                selected_room = Rooms.objects.get(room_id=selected_room_id, business_unit=business_unit)
+            except Rooms.DoesNotExist:
+                # Room doesn't exist, clear the session
+                selected_room_id = None
+                request.session.pop('selected_room_id', None)
+                request.session.modified = True
+
+        # REMOVED: Auto-selection of first room
+        # No longer automatically selecting a room if none is selected
+        # The room should only be set when explicitly selected from admin panel
+
+        # Use current date in IST
+        today = timezone.now().date()
+        logger.debug(f"Current date in home_view: {today}")
+        today_sales_count = SalesHeader.objects.filter(
+            business_unit_id=business_unit_id,
+            branch_id=branch_id,
+            sale_date=today
+        ).count()
+        date_str = today.strftime('%Y%m%d')
+        next_seq_num = str(today_sales_count + 1).zfill(3)
+        next_sale_no = f"{date_str}{next_seq_num}"
+        logger.debug(f"Calculated next_sale_no: {next_sale_no}, business_unit_id: {business_unit_id}, branch_id: {branch_id}, today_sales_count: {today_sales_count}")
+
+        if request.method == 'POST':
+            if 'customer_submit' in request.POST:
+                customer_form = CustomerForm(request.POST, business_unit=business_unit)
+                if customer_form.is_valid():
+                    customer = customer_form.save(commit=False)
+                    customer.business_unit = business_unit
+                    customer.create_by = saas_username
+                    current_date = timezone.now().strftime('%Y-%m-%d')
+                    customer.create_remarks = f"Customer created by {saas_username} on {current_date}"
+                    customer.update_dt = '1900-01-01'
+                    customer.update_tm = '1900-01-01'
+                    customer.update_by = ''
+                    customer.update_marks = ''
+                    customer.save()
+                    return JsonResponse({
+                        'status': 'success',
+                        'customer_id': customer.pk,
+                        'customer_name': customer.customer_name,
+                        'customer_phone': customer.phone_1
+                    })
+                else:
+                    return JsonResponse({
+                        'status': 'error',
+                        'errors': customer_form.errors.as_json()
+                    })
+            elif 'registration_submit' in request.POST:
+                registration_form = RegistrationForm(request.POST, business_unit=business_unit)
+                if registration_form.is_valid():
+                    registration = registration_form.save(commit=False)
+                    registration.business_unit_id = business_unit_id
+                    registration.create_by = saas_username
+                    current_date = timezone.now().strftime('%Y-%m-%d')
+                    registration.create_remarks = f"Registration created by {saas_username} on {current_date}"
+                    registration.update_dt = '1900-01-01'
+                    registration.update_tm = '1900-01-01'
+                    registration.update_by = ''
+                    registration.update_remarks = ''
+                    registration.austatus = ''
+                    registration.save()
+                    return JsonResponse({
+                        'status': 'success',
+                        'registration_id': registration.pk,
+                        'customer_id': registration.customer_id
+                    })
+                else:
+                    return JsonResponse({
+                        'status': 'error',
+                        'errors': registration_form.errors.as_json()
+                    })
+
+        if request.GET.get('action') == 'search_customer':
+            query = request.GET.get('q', '')
+            logger.debug(f"Customer search query: {query}, business_unit_id: {business_unit_id}")
+            customers = Customer.objects.filter(
+                business_unit_id=business_unit_id
+            ).filter(
+                Q(customer_name__icontains=query) |
+                Q(phone_1__icontains=query) |
+                Q(aadhaar_card_no__icontains=query)
+            )[:5]
+            customer_data = [
+                {
+                    'id': c.pk,
+                    'name': c.customer_name,
+                    'phone': c.phone_1,
+                    'aadhaar': c.aadhaar_card_no or 'N/A'
+                } for c in customers
+            ]
+            return JsonResponse({
+                'status': 'success',
+                'customers': customer_data
+            })
+
+        context = {
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'product_groups': product_groups,
+            'products': products,
+            'tables': tables,
+            'rooms': rooms,
+            'vehicles': vehicles,
+            'customers': customers,
+            'customer_form': customer_form,
+            'registration_form': registration_form,
+            'next_sale_no': next_sale_no,
+            'allowed_menu_items': allowed_menu_items,
+            'selected_room_id': selected_room_id,  # Will be None if not explicitly selected
+            'selected_room': selected_room,
+        }
+        return render(request, 'home.html', context)
+
+    except Exception as e:
+        logger.error(f"Error in home_view: {str(e)}")
+        messages.error(request, f"Error: {str(e)}")
+        return redirect('login')    
+
+
+
+
+
+
+        
+
+@login_required
+def get_next_sale_no(request):
+    try:
+        business_unit_id = request.session.get('business_unit_id')
+        branch_id = request.session.get('branch_id')
+        if not business_unit_id or not branch_id:
+            return JsonResponse({'success': False, 'error': 'Missing session data'}, status=400)
+
+        today = timezone.now().date()
+        logger.debug(f"Current date in get_next_sale_no: {today}")
+        today_sales_count = SalesHeader.objects.filter(
+            business_unit_id=business_unit_id,
+            branch_id=branch_id,
+            sale_date=today
+        ).count()
+        date_str = today.strftime('%Y%m%d')
+        next_seq_num = str(today_sales_count + 1).zfill(3)
+        next_sale_no = f"{date_str}{next_seq_num}"
+        logger.debug(f"get_next_sale_no: {next_sale_no}, business_unit_id: {business_unit_id}, branch_id: {branch_id}, today_sales_count: {today_sales_count}")
+
+        return JsonResponse({'success': True, 'next_sale_no': next_sale_no})
+    except Exception as e:
+        logger.error(f"Error in get_next_sale_no: {str(e)}")
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
+
+@csrf_exempt
+@require_POST
+@login_required
+@transaction.atomic
+def save_sale(request):
+    try:
+        saas_user_id = request.session.get('saas_user_id')
+        business_unit_id = request.session.get('business_unit_id')
+        branch_id = request.session.get('branch_id')
+
+        if not all([saas_user_id, business_unit_id, branch_id]):
+            logger.warning("Missing session data: %s", {
+                'saas_user_id': saas_user_id,
+                'business_unit_id': business_unit_id,
+                'branch_id': branch_id
+            })
+            return JsonResponse({'success': False, 'error': 'Incomplete session data. Please log in again.'})
+
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON data in request body")
+            return JsonResponse({'success': False, 'error': 'Invalid request data format.'})
+
+        items = data.get('items', [])
+        customer_id = data.get('customer_id')
+        table_id = data.get('table_id')
+        room_id = data.get('room_id')
+        vehicle_id = data.get('vehicle_id')
+        registration_id = data.get('registration_id')
+        service_type = data.get('service_type', '')
+
+        if not items:
+            logger.warning("No items provided for the sale")
+            return JsonResponse({'success': False, 'error': 'No items provided for the sale.'})
+
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+
+        # Determine customer: prioritize registration customer if registration_id is provided
+        customer = None
+        room = None
+        registration = None
+        if registration_id:
+            try:
+                registration = Registration.objects.get(pk=registration_id)
+                customer = registration.customer  # Assuming Registration has a ForeignKey to Customer
+                room = registration.room  # Assuming Registration has a ForeignKey to Rooms
+            except Registration.DoesNotExist:
+                logger.error("Registration not found: registration_id=%s", registration_id)
+                return JsonResponse({'success': False, 'error': 'Registration not found.'})
+        else:
+            if customer_id:
+                try:
+                    customer = Customer.objects.get(customer_id=customer_id)
+                except Customer.DoesNotExist:
+                    logger.error("Customer not found: customer_id=%s", customer_id)
+                    return JsonResponse({'success': False, 'error': 'Customer not found.'})
+            else:
+                # Fallback to Walking Customer
+                try:
+                    customer = Customer.objects.get(
+                        business_unit_id=business_unit_id,
+                        customer_name="Walking Customer"
+                    )
+                except Customer.DoesNotExist:
+                    logger.error("Walking Customer not found for business_unit_id=%s", business_unit_id)
+                    return JsonResponse({'success': False, 'error': 'Walking Customer not found.'})
+            room = Rooms.objects.get(room_id=room_id) if room_id else None
+
+        table = Tables.objects.get(table_id=table_id) if table_id else None
+        vehicle = Vehicle.objects.get(vehicle_id=vehicle_id) if vehicle_id else None
+
+        default_warehouse = Warehouse.objects.filter(branch=branch).first()
+        if not default_warehouse:
+            logger.error("No warehouse found for branch %s", branch.branch_id)
+            return JsonResponse({'success': False, 'error': 'No warehouse found for this branch.'})
+
+        beverage_groups = ['Water', 'Soft Drinks', 'Beverages', 'Canned Drinks', 'Bottled Water']
+
+        for item in items:
+            try:
+                product = Products.objects.get(product_id=item['id'])
+                is_beverage = False
+                if product.product_group and product.product_group.product_name in beverage_groups:
+                    is_beverage = True
+
+                if is_beverage:
+                    quantity = item.get('quantity', 0)
+                    if not isinstance(quantity, (int, float)) or quantity <= 0:
+                        logger.error("Invalid quantity for product %s: %s", product.product_id, quantity)
+                        return JsonResponse({'success': False, 'error': f"Invalid quantity for product {product.product_name}."})
+                    if product.stock < quantity:
+                        logger.error("Insufficient stock for product %s. Available: %s, Requested: %s",
+                                     product.product_name, product.stock, quantity)
+                        return JsonResponse({
+                            'success': False,
+                            'error': f"Insufficient stock for product {product.product_name}. Available: {product.stock}, Requested: {quantity}"
+                        })
+            except Products.DoesNotExist:
+                logger.error("Product not found: %s", item.get('id'))
+                return JsonResponse({'success': False, 'error': f"Product ID {item.get('id')} not found."})
+            except KeyError as e:
+                logger.error("Missing required item field: %s", str(e))
+                return JsonResponse({'success': False, 'error': f"Missing required field in item: {str(e)}."})
+
+        total_amount = 0
+        total_discount = 0
+        total_tax = 0
+        for item in items:
+            price = item.get('price', 0)
+            quantity = item.get('quantity', 0)
+            discount = item.get('discount', 0)
+            tax = item.get('tax', 0)
+
+            if not all(isinstance(x, (int, float)) for x in [price, quantity, discount, tax]):
+                logger.error("Invalid numeric values in item: %s", item)
+                return JsonResponse({'success': False, 'error': 'Invalid numeric values in item data.'})
+
+            base_price = price * quantity
+            discount_amount = base_price * (discount / 100)
+            taxable_amount = base_price - discount_amount
+            tax_amount = taxable_amount * (tax / 100)
+
+            total_amount += taxable_amount + tax_amount
+            total_discount += discount_amount
+            total_tax += tax_amount
+
+        sale_header = SalesHeader.objects.create(
+            business_unit=business_unit,
+            branch=branch,
+            customer=customer,
+            table=table,
+            room=room,
+            vehicle=vehicle,
+            registration=registration,
+            total_amount=total_amount,
+            discount_amount=total_discount,
+            tax=total_tax,
+            tax_amount=total_tax,
+            payment_method='NONE',
+            payment_status='Unpaid',
+            sale_no=f"SALE-{SalesHeader.objects.count() + 1}",
+            create_by=user.saas_username,
+            create_remarks="Created from POS",
+            service_type=service_type or ''
+        )
+
+        beverage_items = [
+            item for item in items
+            if Products.objects.get(product_id=item['id']).product_group and
+               Products.objects.get(product_id=item['id']).product_group.product_name in beverage_groups
+        ]
+
+        inventory_header = None
+        if beverage_items:
+            net_value = sum(
+                item['quantity'] * Products.objects.get(product_id=item['id']).unit_cost
+                for item in beverage_items
+            )
+            inventory_header = InventoryHeader.objects.create(
+                business_unit=business_unit,
+                branch=branch,
+                warehouse=default_warehouse,
+                grnno='',
+                ref_type='SALES',
+                ref_dt=timezone.now().date(),
+                ref_no=sale_header.sale_no,
+                net_value=-net_value,
+                create_by=user.saas_username,
+                create_remarks=f"Created from sale {sale_header.sale_no}"
+            )
+
+        for item in items:
+            product = Products.objects.get(product_id=item['id'])
+            price = item['price']
+            quantity = item['quantity']
+            discount = item['discount']
+            tax = item['tax']
+
+            base_price = price * quantity
+            discount_amount = base_price * (discount / 100)
+            taxable_amount = base_price - discount_amount
+            tax_amount = taxable_amount * (tax / 100)
+
+            SalesLine.objects.create(
+                sale=sale_header,
+                business_unit=business_unit,
+                branch=branch,
+                customer=customer,
+                product=product,
+                qty=quantity,
+                price=price,
+                total_amount=taxable_amount + tax_amount,
+                discount_amount=discount_amount,
+                tax=tax,
+                tax_amount=tax_amount,
+                create_by=user.saas_username,
+                create_remarks="Created from POS"
+            )
+
+            is_beverage = product.product_group and product.product_group.product_name in beverage_groups
+            if is_beverage:
+                product.stock -= quantity
+                product.save()
+
+                InventoryLine.objects.create(
+                    business_unit=business_unit,
+                    branch=branch,
+                    warehouse=default_warehouse,
+                    inventory=inventory_header,
+                    product=product,
+                    inventory_line_type='SALES',
+                    qty=-quantity,
+                    price=price,
+                    unit_cost=product.unit_cost,
+                    uom=product.uom,
+                    total_value=quantity * price,
+                    total_cost=quantity * product.unit_cost,
+                    create_by=user.saas_username,
+                    create_remarks=f"Sales transaction for sale {sale_header.sale_no}"
+                )
+
+        logger.info("Sale created successfully: sale_id=%s", sale_header.sale_id)
+        return JsonResponse({
+            'success': True,
+            'sale_id': sale_header.sale_id,
+            'registration_id': registration_id,
+            'customer_id': customer.customer_id if customer else None
+        })
+
+    except SAASUsers.DoesNotExist:
+        logger.error("User not found: saas_user_id=%s", saas_user_id)
+        return JsonResponse({'success': False, 'error': 'User not found. Please log in again.'})
+    except BusinessUnit.DoesNotExist:
+        logger.error("Business unit not found: business_unit_id=%s", business_unit_id)
+        return JsonResponse({'success': False, 'error': 'Business unit not found.'})
+    except Branch.DoesNotExist:
+        logger.error("Branch not found: branch_id=%s", branch_id)
+        return JsonResponse({'success': False, 'error': 'Branch not found.'})
+    except Customer.DoesNotExist:
+        logger.error("Customer not found: customer_id=%s", customer_id)
+        return JsonResponse({'success': False, 'error': 'Customer not found.'})
+    except Registration.DoesNotExist:
+        logger.error("Registration not found: registration_id=%s", registration_id)
+        return JsonResponse({'success': False, 'error': 'Registration not found.'})
+    except Exception as e:
+        logger.error("Error in save_sale: %s", str(e), exc_info=True)
+        return JsonResponse({'success': False, 'error': f"An error occurred: {str(e)}"})
+
 logger = logging.getLogger(__name__)
 
 @login_required
@@ -1332,12 +2174,11 @@ def view_order(request):
         return redirect('home')
 
     try:
-        
+       
         today = timezone.now().date()
         start_date = request.GET.get('start_date')
         end_date = request.GET.get('end_date')
 
-       
         if start_date:
             start_date = parse_date(start_date)
         else:
@@ -1347,7 +2188,6 @@ def view_order(request):
         else:
             end_date = today  
 
-        
         unpaid_sales = SalesHeader.objects.filter(
             business_unit_id=business_unit_id,
             payment_status__in=['Unpaid', 'Partially Paid']
@@ -1416,19 +2256,29 @@ def view_order(request):
         return redirect('home')
 
 
-
-logger = logging.getLogger(__name__)
-
+    
 @login_required
 def sale_inquiry(request):
+    saas_user_id = request.session.get('saas_user_id')
     business_unit_id = request.session.get('business_unit_id')
+    saas_username = request.session.get('saas_username')
+    allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
-        
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
         start_date = request.GET.get('start_date')
         end_date = request.GET.get('end_date')
         payment_status = request.GET.getlist('payment_status')
 
-        
         unpaid_sales = SalesHeader.objects.filter(
             business_unit_id=business_unit_id,
             payment_status__in=['Unpaid', 'Partially Paid', 'Paid']
@@ -1436,12 +2286,12 @@ def sale_inquiry(request):
          .annotate(total_items=Count('salesline'))\
          .annotate(
              sale_no_numeric=Cast(
-                 Substr('sale_no', 6),  
+                 Substr('sale_no', 6),
                  output_field=IntegerField()
              )
-         ).order_by('-sale_no_numeric')  
+         ).order_by('-create_dt', '-sale_no_numeric')  
 
-     
+       
         if payment_status:
             unpaid_sales = unpaid_sales.filter(payment_status__in=payment_status)
 
@@ -1451,23 +2301,22 @@ def sale_inquiry(request):
             if start_date:
                 unpaid_sales = unpaid_sales.filter(
                     Q(payment_status='Partially Paid', update_dt__gte=start_date) |
-                    Q(payment_status__in=['Unpaid', 'Paid'], sale_date__gte=start_date)
+                    Q(payment_status__in=['Unpaid', 'Paid'], create_dt__gte=start_date)
                 )
         if end_date:
             end_date = parse_date(end_date)
             if end_date:
                 unpaid_sales = unpaid_sales.filter(
                     Q(payment_status='Partially Paid', update_dt__lte=end_date) |
-                    Q(payment_status__in=['Unpaid', 'Paid'], sale_date__lte=end_date)
+                    Q(payment_status__in=['Unpaid', 'Paid'], create_dt__lte=end_date)
                 )
 
-       
         sales_data = []
         updated_sale_nos = []
         for sale in unpaid_sales:
             paid_amount, balance, payment_details = calculate_payment_details(sale)
 
-            
+       
             new_payment_status = 'Unpaid'
             if paid_amount > 0:
                 new_payment_status = 'Partially Paid' if paid_amount < sale.total_amount else 'Paid'
@@ -1487,16 +2336,15 @@ def sale_inquiry(request):
             else:
                 sale.is_updated = False
 
-            
             sale.paid_amount = paid_amount
             sale.balance = balance
 
-           
+        
             logger.debug(
                 f"sale_inquiry - Sale {sale.sale_no}: "
                 f"total_amount={sale.total_amount:.3f}, paid_amount={paid_amount:.3f}, "
                 f"balance={balance:.3f}, business_unit_id={sale.business_unit.business_unit_id}, "
-                f"update_dt={sale.update_dt}, update_marks={sale.update_marks}, "
+                f"create_dt={sale.create_dt}, update_dt={sale.update_dt}, update_marks={sale.update_marks}, "
                 f"payment_details={payment_details}"
             )
 
@@ -1507,15 +2355,23 @@ def sale_inquiry(request):
                 'paid_amount': float(sale.paid_amount),
                 'balance': float(sale.balance),
                 'payment_status': sale.payment_status,
+                'create_dt': sale.create_dt,
                 'update_dt': sale.update_dt
             })
 
-       
         context = {
             'unpaid_sales': unpaid_sales,
             'start_date': start_date,
             'end_date': end_date,
             'payment_status': payment_status,
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'allowed_menu_items': allowed_menu_items,
+            'app_label': 'pos',
+
         }
         logger.debug(
             f"sale_inquiry: Context sent to sale_inquiry.html: "
@@ -1531,18 +2387,38 @@ def sale_inquiry(request):
         return redirect('home')
     
 
+
 @login_required
 def sale_detail(request, sale_id):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    if not all([saas_user_id, saas_username, saas_customer_id, business_unit_group_id, business_unit_id, branch_id]):
+        logger.error(f"Missing session data: saas_user_id={saas_user_id}, saas_username={saas_username}, "
+                     f"saas_customer_id={saas_customer_id}, business_unit_group_id={business_unit_group_id}, "
+                     f"business_unit_id={business_unit_id}, branch_id={branch_id}")
+        messages.error(request, "Invalid session data. Please log in again.")
+        return redirect('login')
+
     try:
-      
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
         sale = SalesHeader.objects.select_related(
             'customer', 'business_unit', 'branch', 'table', 'room', 'vehicle'
-        ).get(sale_id=sale_id, business_unit_id=request.session.get('business_unit_id'))
+        ).get(sale_id=sale_id, business_unit_id=business_unit_id)
 
-        
         sale_lines = SalesLine.objects.select_related('product').filter(sale_id=sale_id)
 
-      
         paid_amount, balance, payment_details = calculate_payment_details(sale)
         sale.paid_amount = paid_amount
         sale.balance = balance
@@ -1550,6 +2426,13 @@ def sale_detail(request, sale_id):
         context = {
             'sale': sale,
             'sale_lines': sale_lines,
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'allowed_menu_items': allowed_menu_items,
+            'app_label': 'pos',
         }
 
         logger.debug(
@@ -1564,11 +2447,12 @@ def sale_detail(request, sale_id):
         logger.error(f"Sale with ID {sale_id} not found or unauthorized access.")
         messages.error(request, "Sale not found or you do not have access.")
         return redirect('sale_inquiry')
-    except Exception as e:
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist,
+            BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
         logger.error(f"Error in sale_detail: {str(e)}")
-        messages.error(request, f"Error: {str(e)}")
-        return redirect('sale_inquiry')
-    
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')    
+
         
 
 
@@ -1576,6 +2460,7 @@ def sale_detail(request, sale_id):
 @login_required
 def customer_bills(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -1587,6 +2472,7 @@ def customer_bills(request):
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
 
         sales = SalesHeader.objects.filter(
             business_unit_id=business_unit_id
@@ -1611,6 +2497,7 @@ def customer_bills(request):
             'business_unit': business_unit,
             'branch': branch,
             'bills': bills_data,
+            'allowed_menu_items': allowed_menu_items,
         }
         logger.debug(f"Customer Bills: Context sent to customer_bills.html: bills={bills_data}, username={user.saas_username}, business_unit={business_unit}")
         return render(request, 'customer_bills.html', context)
@@ -1622,6 +2509,7 @@ def customer_bills(request):
 @login_required
 def customer_summary(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -1633,6 +2521,8 @@ def customer_summary(request):
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
 
         sales = SalesHeader.objects.filter(
             business_unit_id=business_unit_id
@@ -1669,6 +2559,7 @@ def customer_summary(request):
             'business_unit': business_unit,
             'branch': branch,
             'summary': summary_data,
+            'allowed_menu_items': allowed_menu_items,
         }
         logger.debug(f"Customer Summary: Context sent to customer_summary.html: summary={summary_data}, username={user.saas_username}, business_unit={business_unit}")
         return render(request, 'customer_summary.html', context)
@@ -1684,6 +2575,7 @@ def customer_summary(request):
 @login_required
 def expense_list(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -1695,7 +2587,8 @@ def expense_list(request):
             'saas_customer_id': saas_customer_id,
             'business_unit_group_id': business_unit_group_id,
             'business_unit_id': business_unit_id,
-            'branch_id': branch_id
+            'branch_id': branch_id,
+            
         })
         messages.error(request, "Incomplete session data. Please log in again.")
         return redirect('login')
@@ -1706,6 +2599,8 @@ def expense_list(request):
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, 
             BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
         logger.error(f"Session data not found: {str(e)}")
@@ -1725,6 +2620,7 @@ def expense_list(request):
         'saas_customer': saas_customer,
         'business_unit_group': business_unit_group,
         'branch': branch,
+        'allowed_menu_items': allowed_menu_items,
 
     }
 
@@ -1755,6 +2651,7 @@ def login_required(view_func):
 @login_required
 def general_ledger_report(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -1766,6 +2663,8 @@ def general_ledger_report(request):
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, 
             BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
         logger.error(f"Session data not found in general_ledger_report: {str(e)}")
@@ -1810,6 +2709,7 @@ def general_ledger_report(request):
             'saas_customer': saas_customer,
             'business_unit_group': business_unit_group,
             'branch': branch,
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'general_ledger_report.html', context)
     except Exception as e:
@@ -1830,6 +2730,7 @@ logger = logging.getLogger(__name__)
 @login_required
 def trial_balance_report(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -1841,6 +2742,8 @@ def trial_balance_report(request):
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, 
             BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
         logger.error(f"trial_balance_report: Session data not found: {str(e)}")
@@ -1901,6 +2804,7 @@ def trial_balance_report(request):
             'saas_customer': saas_customer,
             'business_unit_group': business_unit_group,
             'branch': branch,
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'trial_balance_report.html', context)
     except Exception as e:
@@ -1922,6 +2826,7 @@ logger = logging.getLogger(__name__)
 @login_required
 def balance_sheet(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -1933,6 +2838,8 @@ def balance_sheet(request):
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, 
             BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
         logger.error(f"balance_sheet: Session data not found: {str(e)}")
@@ -2086,6 +2993,7 @@ def balance_sheet(request):
             'branch': branch,
             'start_date': start_date,
             'end_date': end_date,
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'balance_sheet.html', context)
     except Exception as e:
@@ -2112,6 +3020,7 @@ logger = logging.getLogger(__name__)
 @login_required
 def income_statement(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -2123,6 +3032,8 @@ def income_statement(request):
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, 
             BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
         logger.error(f"income_statement: Session data not found: {str(e)}")
@@ -2235,6 +3146,7 @@ def income_statement(request):
             'branch': branch,
             'start_date': start_date,
             'end_date': end_date,
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'income_statement.html', context)
     except Exception as e:
@@ -2256,9 +3168,13 @@ def income_statement(request):
 
 
 
+
+from datetime import datetime  
+
 @login_required
 def sales_by_customer_report(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -2270,6 +3186,7 @@ def sales_by_customer_report(request):
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, 
             BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
         logger.error(f"sales_by_customer_report: Session data not found: {str(e)}")
@@ -2318,6 +3235,7 @@ def sales_by_customer_report(request):
             'saas_customer': saas_customer,
             'business_unit_group': business_unit_group,
             'branch': branch,
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'sales_by_customer_report.html', context)
     except Exception as e:
@@ -2330,14 +3248,12 @@ def sales_by_customer_report(request):
             'end_date': end_date,
             'sales': [],
         })
-    
-
-
 
 
 @login_required
 def product_sales_report(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -2349,6 +3265,8 @@ def product_sales_report(request):
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, 
             BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
         logger.error(f"product_sales_report: Session data not found: {str(e)}")
@@ -2406,6 +3324,7 @@ def product_sales_report(request):
             'saas_customer': saas_customer,
             'business_unit_group': business_unit_group,
             'branch': branch,
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'product_sales_report.html', context)
     except Exception as e:
@@ -2426,6 +3345,7 @@ logger = logging.getLogger(__name__)
 @login_required
 def purchase_by_supplier_report(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -2440,6 +3360,8 @@ def purchase_by_supplier_report(request):
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, 
             BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
         logger.error(f"purchase_by_supplier_report: Session data not found: {str(e)}")
@@ -2558,7 +3480,8 @@ def purchase_by_supplier_report(request):
             'total_purchases_sum': total_purchases_sum,
             'total_pos': total_pos,
             'total_paid_sum': total_paid_sum,
-            'total_balance_sum': total_balance_sum
+            'total_balance_sum': total_balance_sum,
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'purchase_by_supplier_report.html', context)
     except Exception as e:
@@ -2584,6 +3507,7 @@ logger = logging.getLogger(__name__)
 @login_required
 def inventory_valuation_report(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -2595,6 +3519,8 @@ def inventory_valuation_report(request):
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
 
         beverage_groups = ['Water', 'Soft Drinks', 'Beverages', 'Canned Drinks', 'Bottled Water']
 
@@ -2639,6 +3565,7 @@ def inventory_valuation_report(request):
             'saas_customer': saas_customer,
             'business_unit_group': business_unit_group,
             'branch': branch,
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'inventory_valuation_report.html', context)
 
@@ -2654,6 +3581,7 @@ def inventory_valuation_report(request):
 @login_required
 def po_creation(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -2665,6 +3593,8 @@ def po_creation(request):
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
 
         products = Products.objects.filter(business_unit=business_unit)
 
@@ -2822,6 +3752,7 @@ def po_creation(request):
             'rooms': Rooms.objects.filter(business_unit=business_unit),
             'vehicles': Vehicle.objects.filter(business_unit=business_unit),
             'customers': Customer.objects.filter(business_unit=business_unit),
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'po_creation.html', context)
 
@@ -2840,6 +3771,7 @@ logger = logging.getLogger(__name__)
 @login_required
 def stock_adjustment(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -2851,6 +3783,8 @@ def stock_adjustment(request):
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
 
         try:
             warehouse = Warehouse.objects.get(branch=branch)
@@ -2932,6 +3866,7 @@ def stock_adjustment(request):
             'saas_customer': saas_customer,
             'business_unit_group': business_unit_group,
             'branch': branch,
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'stock_adjustment.html', context)
 
@@ -2946,6 +3881,7 @@ logger = logging.getLogger(__name__)
 @login_required
 def stock_return(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -2957,6 +3893,8 @@ def stock_return(request):
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
 
         try:
             warehouse = Warehouse.objects.get(branch=branch)
@@ -3043,6 +3981,7 @@ def stock_return(request):
             'saas_customer': saas_customer,
             'business_unit_group': business_unit_group,
             'branch': branch,
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'stock_return.html', context)
 
@@ -3059,6 +3998,7 @@ def stock_return(request):
 @login_required
 def stock_report(request, product_id='1001'):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -3070,6 +4010,8 @@ def stock_report(request, product_id='1001'):
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
 
     
         products = Products.objects.filter(business_unit=business_unit)
@@ -3093,6 +4035,7 @@ def stock_report(request, product_id='1001'):
                 'saas_customer': saas_customer,
                 'business_unit_group': business_unit_group,
                 'branch': branch,
+                'allowed_menu_items': allowed_menu_items,
             }
             return render(request, 'stock_report.html', context)
 
@@ -3185,6 +4128,7 @@ logger = logging.getLogger(__name__)
 @login_required
 def stock_report_list(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -3196,6 +4140,8 @@ def stock_report_list(request):
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
 
         
         start_date = request.GET.get('start_date')
@@ -3317,6 +4263,7 @@ def stock_report_list(request):
             'branch': branch,
             'start_date': start_date,
             'end_date': end_date,
+            'allowed_menu_items': allowed_menu_items,
         }
 
         return render(request, 'stock_report_list.html', context)
@@ -3327,479 +4274,8 @@ def stock_report_list(request):
         return redirect('login')
 
 
-@login_required
-def admin_view(request):
-    saas_user_id = request.session.get('saas_user_id')
-    saas_customer_id = request.session.get('saas_customer_id')
-    business_unit_group_id = request.session.get('business_unit_group_id')
-    business_unit_id = request.session.get('business_unit_id')
-    branch_id = request.session.get('branch_id')
 
-    try:
-        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
-        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
-        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
-        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
-        branch = Branch.objects.get(branch_id=branch_id)
-
-        products_count = Products.objects.filter(business_unit=business_unit).count()
-        customers_count = Customer.objects.filter(business_unit=business_unit).count()
-        supplier_count = Suppliers.objects.filter(business_unit=business_unit).count()
-
-        context = {
-            'username': user.saas_username,
-            'saas_customer': saas_customer,
-            'business_unit_group': business_unit_group,
-            'business_unit': business_unit,
-            'branch': branch,
-            'products_count': products_count,
-            'customers_count': customers_count,
-            'supplier_count': supplier_count,
-            'app_label': 'pos',
-        }
-        return render(request, 'admin.html', context)
-    except Exception as e:
-        logger.error(f"Error in admin_view: {str(e)}")
-        messages.error(request, f"Error: {str(e)}")
-        return redirect('login')
-
-
-
-
-
-
-
-
-@login_required
-def productgroup_add(request):
-    business_unit_id = request.session.get('business_unit_id')
-    saas_user_id = request.session.get('saas_user_id')  
-
-    try:
-        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
-        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)  
-    except BusinessUnit.DoesNotExist:
-        messages.error(request, "Invalid business unit.")
-        return redirect('admin_view')
-    except SAASUsers.DoesNotExist:
-        messages.error(request, "Invalid user session.")
-        return redirect('login')
-
-    if request.method == 'POST':
-        form = ProductGroupForm(request.POST, request.FILES)
-        if form.is_valid():
-            product_group = form.save(commit=False)
-            product_group.business_unit = business_unit
-            product_group.create_by = saas_user.saas_username[:10]  
-            product_group.create_remarks = f"Created by {saas_user.saas_username} for product {form.cleaned_data['product_name']}"[:200]  
-            product_group.save()
-            messages.success(request, "Product Group added successfully.")
-            return redirect('productgroup_list')
-    else:
-        form = ProductGroupForm()
-
-    return render(request, 'productgroup_add.html', {'form': form})
-
-
-
-@login_required
-def productgroup_edit(request, pk):
-    business_unit_id = request.session.get('business_unit_id')
-    saas_user_id = request.session.get('saas_user_id')  
-
-    try:
-        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
-        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)  
-        product_group = get_object_or_404(ProductGroup, pk=pk, business_unit__business_unit_id=business_unit_id)
-    except BusinessUnit.DoesNotExist:
-        messages.error(request, "Invalid business unit.")
-        return redirect('admin_view')
-    except SAASUsers.DoesNotExist:
-        messages.error(request, "Invalid user session.")
-        return redirect('login')
-
-    if request.method == 'POST':
-        form = EditProductGroupForm(request.POST, request.FILES, instance=product_group)
-        if form.is_valid():
-            product_group = form.save(commit=False)
-
-            changed_fields = []
-            for field in form.changed_data:
-                if field == 'product_name':
-                    changed_fields.append('Product Name')
-                elif field == 'product_image':
-                    changed_fields.append('Product Image')
-
-            
-            if 'clear_image' in request.POST and product_group.product_image:
-                product_group.product_image.delete()
-                product_group.product_image = None
-                changed_fields.append('Product Image (cleared)')
-
-            product_group.update_dt = date.today()
-            product_group.update_tm = timezone.now()  
-            product_group.update_by = saas_user.saas_username[:10]  
-            product_group.update_marks = f"Updated: {', '.join(changed_fields)}" if changed_fields else "No fields changed"
-
-            product_group.business_unit = business_unit
-            product_group.save()
-            messages.success(request, "Product Group updated successfully.")
-            return redirect('productgroup_list')
-    else:
-        form = EditProductGroupForm(instance=product_group)
-
-    return render(request, 'productgroup_edit.html', {'form': form, 'product_group': product_group})
-
-
-
-
-
-
-
-@login_required
-def productgroup_list(request):
-    business_unit_id = request.session.get('business_unit_id')
-    try:
-        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
-        product_groups = ProductGroup.objects.filter(business_unit=business_unit).order_by('-create_dt')
-        paginator = Paginator(product_groups, 10)
-        page_number = request.GET.get('page')
-        page_obj = paginator.get_page(page_number)
-        return render(request, 'productgroup_list.html', {'page_obj': page_obj})
-    except BusinessUnit.DoesNotExist:
-        messages.error(request, "Invalid business unit.")
-        return redirect('admin_view')
-
-@login_required
-def productgroup_delete(request, pk):
-    business_unit_id = request.session.get('business_unit_id')
-    try:
-        product_group = get_object_or_404(ProductGroup, pk=pk, business_unit__business_unit_id=business_unit_id)
-        if request.method == 'POST':
-            product_group.delete()
-            messages.success(request, "Product Group deleted successfully.")
-            return redirect('productgroup_list')
-        return render(request, 'productgroup_confirm_delete.html', {'object': product_group})
-    except Exception as e:
-        messages.error(request, f"Error: {str(e)}")
-        return redirect('productgroup_list')
-
-@login_required
-def productgroup_inquiry(request):
-    business_unit_id = request.session.get('business_unit_id')
-    try:
-        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
-        product_groups = ProductGroup.objects.filter(business_unit=business_unit)
-        return render(request, 'productgroup_inquiry.html', {'product_groups': product_groups})
-    except BusinessUnit.DoesNotExist:
-        messages.error(request, "Invalid business unit.")
-        return redirect('admin_view')
-
-@login_required
-def productgroup_dashboard(request):
-    business_unit_id = request.session.get('business_unit_id')
-    try:
-        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
-        product_group_count = ProductGroup.objects.filter(business_unit=business_unit).count()
-        return render(request, 'productgroup_dashboard.html', {'product_group_count': product_group_count})
-    except BusinessUnit.DoesNotExist:
-        messages.error(request, "Invalid business unit.")
-        return redirect('admin_view')
-
-
-
-
-
-
-
-@login_required
-def product_add(request):
-    business_unit_id = request.session.get('business_unit_id')
-    saas_user_id = request.session.get('saas_user_id')
-
-    try:
-        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
-        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
-    except BusinessUnit.DoesNotExist:
-        messages.error(request, "Invalid business unit.")
-        return redirect('admin_view')
-    except SAASUsers.DoesNotExist:
-        messages.error(request, "Invalid user session.")
-        return redirect('login')
-
-    if request.method == 'POST':
-        form = ProductForm(request.POST, request.FILES, business_unit=business_unit)
-        if form.is_valid():
-            product = form.save(commit=False)
-            product.business_unit = business_unit
-            product.create_by = saas_user.saas_username  
-    
-            current_date = timezone.now().strftime('%Y-%m-%d')
-            product.create_remarks = f"Product created by {saas_user.saas_username} on {current_date}"
-        
-            product.update_dt = '1900-01-01'  
-            product.update_tm = '1900-01-01'  
-            product.update_by = ''  
-            product.update_marks = ''  
-            product.save()
-            messages.success(request, "Product added successfully.")
-            return redirect('product_list')
-    else:
-        form = ProductForm(business_unit=business_unit)
-    return render(request, 'product_add.html', {'form': form})
-
-
-
-
-
-
-
-@login_required
-def product_edit(request, pk):
-    business_unit_id = request.session.get('business_unit_id')
-    saas_user_id = request.session.get('saas_user_id')
-
-    try:
-        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
-        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
-        product = get_object_or_404(Products, pk=pk, business_unit__business_unit_id=business_unit_id)
-    except BusinessUnit.DoesNotExist:
-        messages.error(request, "Invalid business unit.")
-        return redirect('admin_view')
-    except SAASUsers.DoesNotExist:
-        messages.error(request, "Invalid user session.")
-        return redirect('login')
-
-    if request.method == 'POST':
-        form = ProductForm(request.POST, request.FILES, instance=product, business_unit=business_unit)
-        if form.is_valid():
-            product = form.save(commit=False)
-
-            changed_fields = []
-            field_display_names = {
-                'product_group': 'Product Group',
-                'category': 'Category',
-                'product_name': 'Product Name',
-                'product_image': 'Product Image',
-                'product_price': 'Product Price',
-                'sale_price': 'Sale Price',
-                'unit_cost': 'Unit Cost',
-                'discount': 'Discount',
-                'tax': 'Tax',
-                'stock': 'Stock',
-                'flag_stock_out': 'Stock Out Flag',
-                'uom': 'Unit of Measure',
-                'sku': 'SKU',
-                'inv_class': 'Inventory Class',
-            }
-            for field in form.changed_data:
-                changed_fields.append(field_display_names.get(field, field))
-
-            
-            if 'clear_image' in request.POST and product.product_image:
-                product.product_image.delete(save=False)
-                product.product_image = None
-                changed_fields.append('Product Image (cleared)')
-
-    
-            product.update_dt = date.today()
-            product.update_tm = timezone.now()  
-            product.update_by = saas_user.saas_username[:10]  
-            product.update_marks = (
-                f"Updated on {date.today().strftime('%Y-%m-%d')} by {saas_user.saas_username[:10]}. "
-                f"Fields changed: {', '.join(changed_fields)}" if changed_fields
-                else f"Form submitted on {date.today().strftime('%Y-%m-%d')} by {saas_user.saas_username[:10]} with no field changes"
-            )[:200]  
-
-            product.business_unit = business_unit
-            product.save()
-            messages.success(request, "Product updated successfully.")
-            return redirect('product_list')
-    else:
-        form = ProductForm(instance=product, business_unit=business_unit)
-
-    return render(request, 'product_edit.html', {'form': form, 'product': product})
-
-
-
-@login_required
-def product_list(request):
-    business_unit_id = request.session.get('business_unit_id')
-    try:
-        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
-        products = Products.objects.filter(business_unit=business_unit).order_by('-create_dt')
-        paginator = Paginator(products, 10)
-        page_number = request.GET.get('page')
-        page_obj = paginator.get_page(page_number)
-        return render(request, 'product_list.html', {'page_obj': page_obj})
-    except BusinessUnit.DoesNotExist:
-        messages.error(request, "Invalid business unit.")
-        return redirect('admin_view')
-
-@login_required
-def product_delete(request, pk):
-    business_unit_id = request.session.get('business_unit_id')
-    try:
-        product = get_object_or_404(Products, pk=pk, business_unit__business_unit_id=business_unit_id)
-        if request.method == 'POST':
-            product.delete()
-            messages.success(request, "Product deleted successfully.")
-            return redirect('product_list')
-        return render(request, 'product_confirm_delete.html', {'object': product})
-    except Exception as e:
-        messages.error(request, f"Error: {str(e)}")
-        return redirect('product_list')
-
-@login_required
-def product_inquiry(request):
-    business_unit_id = request.session.get('business_unit_id')
-    try:
-        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
-        products = Products.objects.filter(business_unit=business_unit)
-        return render(request, 'product_inquiry.html', {'products': products})
-    except BusinessUnit.DoesNotExist:
-        messages.error(request, "Invalid business unit.")
-        return redirect('admin_view')
-
-@login_required
-def product_dashboard(request):
-    business_unit_id = request.session.get('business_unit_id')
-    try:
-        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
-        product_count = Products.objects.filter(business_unit=business_unit).count()
-        return render(request, 'product_dashboard.html', {'product_count': product_count})
-    except BusinessUnit.DoesNotExist:
-        messages.error(request, "Invalid business unit.")
-        return redirect('admin_view')
-
-
-
-
-@login_required
-def supplier_add(request):
-    business_unit_id = request.session.get('business_unit_id')
-    saas_user_id = request.session.get('saas_user_id')
-
-    try:
-        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
-        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
-    except BusinessUnit.DoesNotExist:
-        messages.error(request, "Invalid business unit.")
-        return redirect('admin_view')
-    except SAASUsers.DoesNotExist:
-        messages.error(request, "Invalid user session.")
-        return redirect('login')
-
-    if request.method == 'POST':
-        form = SupplierForm(request.POST)
-        if form.is_valid():
-            supplier = form.save(commit=False)
-            supplier.business_unit = business_unit
-            supplier.create_by = saas_user.saas_username[:10]
-            supplier.create_remarks = f"Created by {saas_user.saas_username} for supplier {form.cleaned_data['supplier_name']}"[:200]
-            supplier.save()
-            messages.success(request, "Supplier added successfully.")
-            return redirect('supplier_list')
-    else:
-        form = SupplierForm()
-
-    return render(request, 'supplier_add.html', {'form': form})
-
-
-
-@login_required
-def supplier_edit(request, pk):
-    business_unit_id = request.session.get('business_unit_id')
-    saas_user_id = request.session.get('saas_user_id')
-
-    try:
-        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
-        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
-        supplier = get_object_or_404(Suppliers, pk=pk, business_unit__business_unit_id=business_unit_id)
-    except BusinessUnit.DoesNotExist:
-        messages.error(request, "Invalid business unit.")
-        return redirect('admin_view')
-    except SAASUsers.DoesNotExist:
-        messages.error(request, "Invalid user session.")
-        return redirect('login')
-
-    if request.method == 'POST':
-        form = EditSupplierForm(request.POST, instance=supplier)
-        if form.is_valid():
-            supplier = form.save(commit=False)
-            changed_fields = [field for field in form.changed_data]
-            field_names = {
-                'supplier_type': 'Supplier Type',
-                'supplier_name': 'Supplier Name',
-                'phone_1': 'Primary Phone',
-                'phone_2': 'Secondary Phone',
-                'email': 'Email',
-                'address': 'Address'
-            }
-            changed_labels = [field_names.get(field, field) for field in changed_fields]
-            supplier.update_dt = date.today()
-            supplier.update_tm = timezone.now()
-            supplier.update_by = saas_user.saas_username[:10]
-            supplier.update_marks = f"Updated: {', '.join(changed_labels)}" if changed_labels else "No fields changed"
-            supplier.business_unit = business_unit
-            supplier.save()
-            messages.success(request, "Supplier updated successfully.")
-            return redirect('supplier_list')
-    else:
-        form = EditSupplierForm(instance=supplier)
-
-    return render(request, 'supplier_edit.html', {'form': form, 'supplier': supplier})
-
-@login_required
-def supplier_list(request):
-    business_unit_id = request.session.get('business_unit_id')
-    try:
-        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
-        suppliers = Suppliers.objects.filter(business_unit=business_unit).order_by('-create_dt')
-        paginator = Paginator(suppliers, 10)
-        page_number = request.GET.get('page')
-        page_obj = paginator.get_page(page_number)
-        return render(request, 'supplier_list.html', {'page_obj': page_obj})
-    except BusinessUnit.DoesNotExist:
-        messages.error(request, "Invalid business unit.")
-        return redirect('admin_view')
-
-@login_required
-def supplier_delete(request, pk):
-    business_unit_id = request.session.get('business_unit_id')
-    try:
-        supplier = get_object_or_404(Suppliers, pk=pk, business_unit__business_unit_id=business_unit_id)
-        if request.method == 'POST':
-            supplier.delete()
-            messages.success(request, "Supplier deleted successfully.")
-            return redirect('supplier_list')
-        return render(request, 'supplier_confirm_delete.html', {'object': supplier})
-    except Exception as e:
-        messages.error(request, f"Error: {str(e)}")
-        return redirect('supplier_list')
-
-@login_required
-def supplier_inquiry(request):
-    business_unit_id = request.session.get('business_unit_id')
-    try:
-        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
-        suppliers = Suppliers.objects.filter(business_unit=business_unit)
-        return render(request, 'supplier_inquiry.html', {'suppliers': suppliers})
-    except BusinessUnit.DoesNotExist:
-        messages.error(request, "Invalid business unit.")
-        return redirect('admin_view')
-
-@login_required
-def supplier_dashboard(request):
-    business_unit_id = request.session.get('business_unit_id')
-    try:
-        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
-        supplier_count = Suppliers.objects.filter(business_unit=business_unit).count()
-        return render(request, 'supplier_dashboard.html', {'supplier_count': supplier_count})
-    except BusinessUnit.DoesNotExist:
-        messages.error(request, "Invalid business unit.")
-        return redirect('admin_view')
-    
+ 
 
 
 @login_required
@@ -4242,6 +4718,7 @@ def calculate_payment_detailss(po):
 def po_inquiry(request):
    
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -4253,6 +4730,8 @@ def po_inquiry(request):
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
 
         purchase_orders = PurchaseOrders.objects.filter(
             business_unit=business_unit,
@@ -4283,6 +4762,7 @@ def po_inquiry(request):
             'purchase_orders': purchase_orders,
             'start_date': request.GET.get('start_date', ''),
             'end_date': request.GET.get('end_date', ''),
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'po_inquiry.html', context)
 
@@ -4299,6 +4779,7 @@ logger = logging.getLogger(__name__)
 @login_required
 def po_detail(request, poid):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -4310,6 +4791,8 @@ def po_detail(request, poid):
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
 
         
         purchase_order = PurchaseOrders.objects.filter(
@@ -4335,6 +4818,7 @@ def po_detail(request, poid):
             'business_unit': business_unit,
             'branch': branch,
             'purchase_order': purchase_order,
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'po_detail.html', context)
 
@@ -4352,6 +4836,7 @@ logger = logging.getLogger(__name__)
 
 def room_add(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -4363,6 +4848,8 @@ def room_add(request):
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
         logger.error(f"Error in room_add: {str(e)}")
         messages.error(request, f"Invalid session data: {str(e)}")
@@ -4396,11 +4883,13 @@ def room_add(request):
         'business_unit': business_unit,
         'branch': branch,
         'app_label': 'pos',
+        'allowed_menu_items': allowed_menu_items,
     }
     return render(request, 'room_add.html', context)
 
 def room_edit(request, pk):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -4413,6 +4902,8 @@ def room_edit(request, pk):
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
         room = get_object_or_404(Rooms, pk=pk, business_unit__business_unit_id=business_unit_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
         logger.error(f"Error in room_edit: {str(e)}")
         messages.error(request, f"Invalid session data: {str(e)}")
@@ -4459,11 +4950,13 @@ def room_edit(request, pk):
         'business_unit': business_unit,
         'branch': branch,
         'app_label': 'pos',
+        'allowed_menu_items': allowed_menu_items,
     }
     return render(request, 'room_edit.html', context)
 
 def room_list(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -4479,6 +4972,8 @@ def room_list(request):
         paginator = Paginator(rooms, 10)
         page_number = request.GET.get('page')
         page_obj = paginator.get_page(page_number)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
 
         context = {
             'page_obj': page_obj,
@@ -4488,6 +4983,7 @@ def room_list(request):
             'business_unit': business_unit,
             'branch': branch,
             'app_label': 'pos',
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'room_list.html', context)
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
@@ -4497,6 +4993,7 @@ def room_list(request):
 
 def room_delete(request, pk):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -4509,6 +5006,8 @@ def room_delete(request, pk):
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
         room = get_object_or_404(Rooms, pk=pk, business_unit__business_unit_id=business_unit_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
         if request.method == 'POST':
             room.delete()
             messages.success(request, "Room deleted successfully.")
@@ -4522,6 +5021,7 @@ def room_delete(request, pk):
             'business_unit': business_unit,
             'branch': branch,
             'app_label': 'pos',
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'room_confirm_delete.html', context)
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
@@ -4531,6 +5031,7 @@ def room_delete(request, pk):
 
 def room_inquiry(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -4543,6 +5044,8 @@ def room_inquiry(request):
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
         rooms = Rooms.objects.filter(business_unit=business_unit)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
 
         context = {
             'rooms': rooms,
@@ -4552,6 +5055,7 @@ def room_inquiry(request):
             'business_unit': business_unit,
             'branch': branch,
             'app_label': 'pos',
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'room_inquiry.html', context)
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
@@ -4559,39 +5063,231 @@ def room_inquiry(request):
         messages.error(request, f"Invalid session data: {str(e)}")
         return redirect('login')
 
+
+@login_required
 def room_dashboard(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
     branch_id = request.session.get('branch_id')
+    selected_room_id = request.session.get('selected_room_id')
 
     try:
+        
+        if not all([saas_user_id, saas_customer_id, business_unit_group_id, business_unit_id, branch_id]):
+            logger.error("Missing session data")
+            messages.error(request, "Invalid session data. Please log in again.")
+            return redirect('login')
+
         user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
-        room_count = Rooms.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
+
+        
+        if request.method == 'POST' and 'room_id' in request.POST:
+            selected_room_id = request.POST.get('room_id')
+            request.session['selected_room_id'] = selected_room_id
+            request.session.modified = True
+            logger.info(f"Room selected: {selected_room_id}")
+            return redirect('home')
+
+        
+        total_rooms = Rooms.objects.filter(business_unit=business_unit).count()
+        logger.info(f"Total rooms for business unit {business_unit_id}: {total_rooms}")
+
+        
+        base_query = Registration.objects.filter(
+            business_unit_id=business_unit_id
+        ).select_related('room', 'customer').order_by('-start_dt')
+
+        
+        booked_not_confirmed_qs = base_query.filter(booking_status='00')
+        booked_not_confirmed = booked_not_confirmed_qs.count()
+        booked_paginator = Paginator(booked_not_confirmed_qs, 10)
+        booked_page_number = request.GET.get('booked_page')
+        booked_page_obj = booked_paginator.get_page(booked_page_number)
+        booked_not_confirmed_list = [
+            {
+                'booking_id': reg.booking_id,
+                'room_id': reg.room.room_id,
+                'room_name': reg.room.room_name,
+                'room_location': reg.room.location or 'N/A',
+                'customer_name': reg.customer.customer_name if reg.customer else 'N/A',
+                'start_dt': reg.start_dt,
+                'end_dt': reg.end_dt,
+                'booking_status': reg.booking_status
+            } for reg in booked_page_obj
+        ]
+
+        
+        confirmed_rooms_qs = base_query.filter(booking_status='10')
+        confirmed_rooms = confirmed_rooms_qs.count()
+        confirmed_paginator = Paginator(confirmed_rooms_qs, 10)
+        confirmed_page_number = request.GET.get('confirmed_page')
+        confirmed_page_obj = confirmed_paginator.get_page(confirmed_page_number)
+        confirmed_rooms_list = [
+            {
+                'booking_id': reg.booking_id,
+                'room_id': reg.room.room_id,
+                'room_name': reg.room.room_name,
+                'room_location': reg.room.location or 'N/A',
+                'customer_name': reg.customer.customer_name if reg.customer else 'N/A',
+                'start_dt': reg.start_dt,
+                'end_dt': reg.end_dt,
+                'booking_status': reg.booking_status
+            } for reg in confirmed_page_obj
+        ]
+
+        
+        occupied_rooms_qs = base_query.filter(booking_status='20')
+        occupied_rooms = occupied_rooms_qs.count()
+        occupied_paginator = Paginator(occupied_rooms_qs, 10)
+        occupied_page_number = request.GET.get('occupied_page')
+        occupied_page_obj = occupied_paginator.get_page(occupied_page_number)
+        occupied_rooms_list = [
+            {
+                'booking_id': reg.booking_id,
+                'room_id': reg.room.room_id,
+                'room_name': reg.room.room_name,
+                'room_location': reg.room.location or 'N/A',
+                'customer_name': reg.customer.customer_name if reg.customer else 'N/A',
+                'start_dt': reg.start_dt,
+                'end_dt': reg.end_dt,
+                'booking_status': reg.booking_status
+            } for reg in occupied_page_obj
+        ]
+
+        
+        cancelled_rooms_qs = base_query.filter(booking_status='40')
+        cancelled_rooms = cancelled_rooms_qs.count()
+        cancelled_paginator = Paginator(cancelled_rooms_qs, 10)
+        cancelled_page_number = request.GET.get('cancelled_page')
+        cancelled_page_obj = cancelled_paginator.get_page(cancelled_page_number)
+        cancelled_rooms_list = [
+            {
+                'booking_id': reg.booking_id,
+                'room_id': reg.room.room_id,
+                'room_name': reg.room.room_name,
+                'room_location': reg.room.location or 'N/A',
+                'customer_name': reg.customer.customer_name if reg.customer else 'N/A',
+                'start_dt': reg.start_dt,
+                'end_dt': reg.end_dt,
+                'booking_status': reg.booking_status
+            } for reg in cancelled_page_obj
+        ]
+
+        
+        released_rooms_qs = base_query.filter(booking_status='50')
+        released_rooms = released_rooms_qs.count()
+        released_paginator = Paginator(released_rooms_qs, 10)
+        released_page_number = request.GET.get('released_page')
+        released_page_obj = released_paginator.get_page(released_page_number)
+        released_rooms_list = [
+            {
+                'booking_id': reg.booking_id,
+                'room_id': reg.room.room_id,
+                'room_name': reg.room.room_name,
+                'room_location': reg.room.location or 'N/A',
+                'customer_name': reg.customer.customer_name if reg.customer else 'N/A',
+                'start_dt': reg.start_dt,
+                'end_dt': reg.end_dt,
+                'booking_status': reg.booking_status
+            } for reg in released_page_obj
+        ]
+
+        
+        active_bookings = base_query.filter(booking_status__in=['00', '10', '20'])
+        booked_room_ids = active_bookings.values_list('room__room_id', flat=True)
+        available_rooms_qs = Rooms.objects.filter(business_unit=business_unit).exclude(room_id__in=booked_room_ids).order_by('-create_dt')
+        available_rooms = available_rooms_qs.count()
+        available_paginator = Paginator(available_rooms_qs, 10)
+        available_page_number = request.GET.get('available_page')
+        available_page_obj = available_paginator.get_page(available_page_number)
+        available_rooms_list = [
+            {
+                'room_id': room.room_id,
+                'room_name': room.room_name,
+                'room_location': room.location or 'N/A'
+            } for room in available_page_obj
+        ]
+
+        
+        selected_room = None
+        if selected_room_id:
+            try:
+                selected_room = Rooms.objects.get(room_id=selected_room_id, business_unit=business_unit)
+            except Rooms.DoesNotExist:
+                selected_room_id = None
+                request.session.pop('selected_room_id', None)
+                request.session.modified = True
+
+       
+        counts = {
+            'total': total_rooms,
+            'available': available_rooms,
+            'booked': booked_not_confirmed,
+            'confirmed': confirmed_rooms,
+            'occupied': occupied_rooms,
+            'cancelled': cancelled_rooms,
+            'released': released_rooms
+        }
 
         context = {
-            'room_count': room_count,
             'username': user.saas_username,
             'saas_customer': saas_customer,
             'business_unit_group': business_unit_group,
             'business_unit': business_unit,
             'branch': branch,
+            'total_rooms': total_rooms,
+            'available_rooms': available_rooms,
+            'booked_not_confirmed': booked_not_confirmed,
+            'confirmed_rooms': confirmed_rooms,
+            'occupied_rooms': occupied_rooms,
+            'cancelled_rooms': cancelled_rooms,
+            'released_rooms': released_rooms,
+            'available_rooms_list': available_rooms_list,
+            'booked_not_confirmed_list': booked_not_confirmed_list,
+            'confirmed_rooms_list': confirmed_rooms_list,
+            'occupied_rooms_list': occupied_rooms_list,
+            'cancelled_rooms_list': cancelled_rooms_list,
+            'released_rooms_list': released_rooms_list,
+            'counts': counts,
+            'selected_room_id': selected_room_id,
+            'selected_room': selected_room,
+            'rooms': Rooms.objects.filter(business_unit=business_unit),
             'app_label': 'pos',
+            'available_page_obj': available_page_obj,
+            'booked_page_obj': booked_page_obj,
+            'confirmed_page_obj': confirmed_page_obj,
+            'occupied_page_obj': occupied_page_obj,
+            'cancelled_page_obj': cancelled_page_obj,
+            'released_page_obj': released_page_obj,
+            'allowed_menu_items': allowed_menu_items,
         }
+
+        logger.debug(f"Context for room_dashboard: {context}")
         return render(request, 'room_dashboard.html', context)
-    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, 
+            BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
         logger.error(f"Error in room_dashboard: {str(e)}")
         messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+    except Exception as e:
+        logger.error(f"Unexpected error in room_dashboard: {str(e)}")
+        messages.error(request, f"An error occurred: {str(e)}")
         return redirect('login')
 
 
 def table_add(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -4603,6 +5299,8 @@ def table_add(request):
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
         logger.error(f"Error in table_add: {str(e)}")
         messages.error(request, f"Invalid session data: {str(e)}")
@@ -4636,11 +5334,13 @@ def table_add(request):
         'business_unit': business_unit,
         'branch': branch,
         'app_label': 'pos',
+        'allowed_menu_items': allowed_menu_items,
     }
     return render(request, 'table_add.html', context)
 
 def table_edit(request, pk):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -4653,6 +5353,8 @@ def table_edit(request, pk):
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
         table = get_object_or_404(Tables, pk=pk, business_unit__business_unit_id=business_unit_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
         logger.error(f"Error in table_edit: {str(e)}")
         messages.error(request, f"Invalid session data: {str(e)}")
@@ -4696,11 +5398,13 @@ def table_edit(request, pk):
         'business_unit': business_unit,
         'branch': branch,
         'app_label': 'pos',
+        'allowed_menu_items': allowed_menu_items,
     }
     return render(request, 'table_edit.html', context)
 
 def table_list(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -4716,6 +5420,8 @@ def table_list(request):
         paginator = Paginator(tables, 10)
         page_number = request.GET.get('page')
         page_obj = paginator.get_page(page_number)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
 
         context = {
             'page_obj': page_obj,
@@ -4725,6 +5431,7 @@ def table_list(request):
             'business_unit': business_unit,
             'branch': branch,
             'app_label': 'pos',
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'table_list.html', context)
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
@@ -4734,6 +5441,7 @@ def table_list(request):
 
 def table_delete(request, pk):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -4746,6 +5454,8 @@ def table_delete(request, pk):
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
         table = get_object_or_404(Tables, pk=pk, business_unit__business_unit_id=business_unit_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
         if request.method == 'POST':
             table.delete()
             messages.success(request, "Table deleted successfully.")
@@ -4759,6 +5469,7 @@ def table_delete(request, pk):
             'business_unit': business_unit,
             'branch': branch,
             'app_label': 'pos',
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'table_confirm_delete.html', context)
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
@@ -4768,6 +5479,7 @@ def table_delete(request, pk):
 
 def table_inquiry(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -4780,6 +5492,8 @@ def table_inquiry(request):
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
         tables = Tables.objects.filter(business_unit=business_unit)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
 
         context = {
             'tables': tables,
@@ -4789,6 +5503,7 @@ def table_inquiry(request):
             'business_unit': business_unit,
             'branch': branch,
             'app_label': 'pos',
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'table_inquiry.html', context)
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
@@ -4798,6 +5513,7 @@ def table_inquiry(request):
 
 def table_dashboard(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -4810,6 +5526,8 @@ def table_dashboard(request):
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
         table_count = Tables.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
 
         context = {
             'table_count': table_count,
@@ -4819,6 +5537,7 @@ def table_dashboard(request):
             'business_unit': business_unit,
             'branch': branch,
             'app_label': 'pos',
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'table_dashboard.html', context)
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
@@ -4829,6 +5548,7 @@ def table_dashboard(request):
 
 def vehicle_add(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -4840,6 +5560,8 @@ def vehicle_add(request):
         business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
         logger.error(f"Error in vehicle_add: {str(e)}")
         messages.error(request, f"Invalid session data: {str(e)}")
@@ -4873,11 +5595,13 @@ def vehicle_add(request):
         'business_unit': business_unit,
         'branch': branch,
         'app_label': 'pos',
+        'allowed_menu_items': allowed_menu_items,
     }
     return render(request, 'vehicle_add.html', context)
 
 def vehicle_edit(request, pk):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -4890,6 +5614,8 @@ def vehicle_edit(request, pk):
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
         vehicle = get_object_or_404(Vehicle, pk=pk, business_unit__business_unit_id=business_unit_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
         logger.error(f"Error in vehicle_edit: {str(e)}")
         messages.error(request, f"Invalid session data: {str(e)}")
@@ -4933,11 +5659,13 @@ def vehicle_edit(request, pk):
         'business_unit': business_unit,
         'branch': branch,
         'app_label': 'pos',
+        'allowed_menu_items': allowed_menu_items,
     }
     return render(request, 'vehicle_edit.html', context)
 
 def vehicle_list(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -4953,6 +5681,8 @@ def vehicle_list(request):
         paginator = Paginator(vehicles, 10)
         page_number = request.GET.get('page')
         page_obj = paginator.get_page(page_number)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
 
         context = {
             'page_obj': page_obj,
@@ -4962,6 +5692,7 @@ def vehicle_list(request):
             'business_unit': business_unit,
             'branch': branch,
             'app_label': 'pos',
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'vehicle_list.html', context)
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
@@ -4971,6 +5702,7 @@ def vehicle_list(request):
 
 def vehicle_delete(request, pk):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -4983,6 +5715,8 @@ def vehicle_delete(request, pk):
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
         vehicle = get_object_or_404(Vehicle, pk=pk, business_unit__business_unit_id=business_unit_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
         if request.method == 'POST':
             vehicle.delete()
             messages.success(request, "Vehicle deleted successfully.")
@@ -4996,6 +5730,7 @@ def vehicle_delete(request, pk):
             'business_unit': business_unit,
             'branch': branch,
             'app_label': 'pos',
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'vehicle_confirm_delete.html', context)
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
@@ -5005,6 +5740,7 @@ def vehicle_delete(request, pk):
 
 def vehicle_inquiry(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -5017,6 +5753,8 @@ def vehicle_inquiry(request):
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
         vehicles = Vehicle.objects.filter(business_unit=business_unit)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
 
         context = {
             'vehicles': vehicles,
@@ -5026,6 +5764,7 @@ def vehicle_inquiry(request):
             'business_unit': business_unit,
             'branch': branch,
             'app_label': 'pos',
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'vehicle_inquiry.html', context)
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
@@ -5035,6 +5774,7 @@ def vehicle_inquiry(request):
 
 def vehicle_dashboard(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
@@ -5047,6 +5787,8 @@ def vehicle_dashboard(request):
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
         vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
 
         context = {
             'vehicle_count': vehicle_count,
@@ -5056,6 +5798,7 @@ def vehicle_dashboard(request):
             'business_unit': business_unit,
             'branch': branch,
             'app_label': 'pos',
+            'allowed_menu_items': allowed_menu_items,
         }
         return render(request, 'vehicle_dashboard.html', context)
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist, BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
@@ -5066,16 +5809,1668 @@ def vehicle_dashboard(request):
 
 
 
+
+
+
+@login_required
+def get_authority_data(request, user_id):
+    business_unit_id = request.session.get('business_unit_id')
+    business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+    authorities = Authority.objects.filter(saas_username=user_id, business_unit=business_unit)
+    current_permissions = [{'au_menu': a.au_menu, 'au_submenu': a.au_submenu, 'au_status': a.au_status, 'au_submenu_text': a.au_submenu_text} for a in authorities]
+    
+    
+    new_access_items = list(Authority.objects.filter(business_unit=business_unit)
+                           .values('au_menu', 'au_submenu', 'au_submenu_text')
+                           .distinct())
+    new_access_items = [{'au_menu': item['au_menu'], 'au_submenu': item['au_submenu'], 'au_submenu_text': item['au_submenu_text']} for item in new_access_items]
+    
+    return JsonResponse({'current_permissions': current_permissions, 'new_access_items': new_access_items})
+
+@login_required
+@require_POST
+def save_authority_data(request):
+    data = json.loads(request.body)
+    user_id = data.get('user_id')
+    permissions = data.get('permissions')
+    business_unit_id = request.session.get('business_unit_id')
+    business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+    for perm in permissions:
+        authority, created = Authority.objects.update_or_create(
+            saas_username=user_id,
+            au_menu=perm['au_menu'],
+            au_submenu=perm['au_submenu'],
+            business_unit=business_unit,
+            defaults={
+                'au_status': perm['au_status'],
+                'au_submenu_text': perm.get('au_submenu_text', '')  
+            }
+        )
+    return JsonResponse({'success': True})
+
+
+
+@login_required
+@require_POST
+def save_authority_data(request):
+    data = json.loads(request.body)
+    user_id = data.get('user_id')
+    permissions = data.get('permissions')
+    business_unit_id = request.session.get('business_unit_id')
+    business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+    for perm in permissions:
+        authority, created = Authority.objects.update_or_create(
+            saas_username=user_id,
+            au_menu=perm['au_menu'],
+            au_submenu=perm['au_submenu'],
+            business_unit=business_unit,
+            defaults={
+                'au_status': perm['au_status'],
+                'au_submenu_text': perm.get('au_submenu_text', '') 
+            }
+        )
+    return JsonResponse({'success': True})
+
+
+        
+
+
+
+
+logger = logging.getLogger(__name__)
+
+
+def login_required(view_func):
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        missing_keys = []
+        if 'saas_user_id' not in request.session:
+            missing_keys.append('saas_user_id')
+        if 'business_unit_id' not in request.session:
+            missing_keys.append('business_unit_id')
+        if 'branch_id' not in request.session:
+            missing_keys.append('branch_id')
+        
+        if missing_keys:
+            logger.warning(f"Access denied to {view_func.__name__}. Missing session keys: {missing_keys}")
+            messages.error(request, f"Please log in and select a business unit and branch. Missing: {', '.join(missing_keys)}")
+            return redirect('login')
+        
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
+@login_required
+def get_authority_data(request, user_id):
+    try:
+        
+        business_unit_id = request.session.get('business_unit_id')
+        if not business_unit_id:
+            return JsonResponse({'error': 'No business unit in session'}, status=400)
+        
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        
+        
+        try:
+            selected_user = SAASUsers.objects.get(saas_user_id=user_id)
+        except SAASUsers.DoesNotExist:
+            return JsonResponse({'error': 'User not found'}, status=404)
+        
+        
+        authorities = Authority.objects.filter(
+            saas_username=selected_user.saas_username, 
+            business_unit=business_unit
+        ).values('au_menu', 'au_submenu', 'au_status', 'au_submenu_text')
+        
+        current_permissions = []
+        for auth in authorities:
+            current_permissions.append({
+                'au_menu': auth['au_menu'],
+                'au_submenu': auth['au_submenu'], 
+                'au_status': bool(auth['au_status']),  
+                'au_submenu_text': auth['au_submenu_text']
+            })
+        
+        
+        all_items = list(Authority.objects.filter(business_unit=business_unit)
+                         .values('au_menu', 'au_submenu', 'au_submenu_text')
+                         .distinct())
+        
+       
+        current_menus = {(p['au_menu'], p['au_submenu']) for p in current_permissions}
+        
+        
+        new_access_items = [item for item in all_items if (item['au_menu'], item['au_submenu']) not in current_menus]
+        
+        response_data = {
+            'current_permissions': current_permissions, 
+            'new_access_items': new_access_items,
+            'user_id': user_id,
+            'username': selected_user.saas_username
+        }
+        
+        return JsonResponse(response_data)
+        
+    except BusinessUnit.DoesNotExist:
+        return JsonResponse({'error': 'Business unit not found'}, status=404)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+        
+
+@login_required
+def authority_assign(request, pk=None):
+    
+    saas_user_id = request.session.get('saas_user_id')
+    business_unit_id = request.session.get('business_unit_id')
+    saas_username = request.session.get('saas_username')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+    except (SAASUsers.DoesNotExist, BusinessUnit.DoesNotExist):
+        messages.error(request, "Invalid user or business unit session.")
+        logger.error(f"Invalid session: saas_user_id={saas_user_id}, business_unit_id={business_unit_id}")
+        return redirect('login')
+
+    
+    Authority.objects.filter(business_unit=business_unit).update(au_type='TREEVIEW')
+
+   
+    authority_users = Authority.objects.filter(business_unit=business_unit).values_list('saas_username', flat=True).distinct()
+    users = SAASUsers.objects.filter(saas_username__in=authority_users).distinct()
+
+    
+    menu_items = Authority.objects.filter(business_unit=business_unit).values(
+        'au_menu', 'au_submenu', 'au_menu_text', 'au_submenu_text'
+    ).distinct().order_by('au_menu', 'au_submenu')
+
+    
+    selected_user = None
+    existing_authorities = []
+    if pk:
+        selected_user = get_object_or_404(SAASUsers, saas_user_id=pk)
+        existing_authorities = Authority.objects.filter(
+            business_unit=business_unit, saas_username=selected_user.saas_username
+        ).values('au_menu', 'au_submenu', 'au_status')
+    elif saas_user_id and saas_user.saas_username in authority_users:
+        selected_user = saas_user
+        existing_authorities = Authority.objects.filter(
+            business_unit=business_unit, saas_username=saas_user.saas_username
+        ).values('au_menu', 'au_submenu', 'au_status')
+
+    
+    saas_user_form = SAASUserForm(business_unit_id=business_unit_id, logged_in_username=saas_user.saas_username)
+
+
+    if request.method == 'POST':
+        if 'authority_submit' in request.POST:
+            user_id = request.POST.get('user_id')
+            if user_id:
+                try:
+                    selected_user = get_object_or_404(SAASUsers, saas_user_id=int(user_id))
+                except ValueError:
+                    messages.error(request, "Invalid user ID format.")
+                    return redirect('authority_assign')
+            if not selected_user:
+                messages.error(request, "No user selected.")
+                return redirect('authority_assign')
+            
+            checked_strs = request.POST.getlist('selected')
+            checked = set()
+            for cs in checked_strs:
+                parts = cs.split(':')
+                if len(parts) == 2:
+                    checked.add((parts[0], parts[1]))
+
+            existing = Authority.objects.filter(business_unit=business_unit, saas_username=selected_user.saas_username)
+            existing_map = {(a.au_menu, a.au_submenu): a for a in existing}
+
+            current_time = timezone.now()
+            current_date_str = current_time.strftime('%Y-%m-%d')
+            updater = saas_user.saas_username[:10]
+
+            for menu, submenu in checked:
+                if (menu, submenu) in existing_map:
+                    auth = existing_map[(menu, submenu)]
+                    if not auth.au_status:
+                        auth.au_status = True
+                        auth.au_update_dt = current_time
+                        auth.au_update_tm = current_time
+                        auth.au_update_by = updater
+                        auth.au_update_remarks = f"Set to TRUE on {current_date_str} by {updater}"
+                        auth.save()
+                else:
+                    item = next((mi for mi in menu_items if mi['au_menu'] == menu and mi['au_submenu'] == submenu), None)
+                    if item:
+                        auth = Authority(
+                            business_unit=business_unit,
+                            au_type='TREEVIEW',
+                            saas_username=selected_user.saas_username,
+                            au_menu=menu,
+                            au_submenu=submenu,
+                            au_menu_text=item['au_menu_text'],
+                            au_submenu_text=item['au_submenu_text'],
+                            au_status=True,
+                            au_create_dt=current_time.date(),
+                            au_create_tm=current_time,
+                            au_create_by=updater,
+                            au_create_remarks=f"Created on {current_date_str} by {updater}",
+                            au_update_dt='1900-01-01',
+                            au_update_tm='1900-01-01',
+                            au_update_by='',
+                            au_update_remarks=''
+                        )
+                        auth.save()
+
+            for (menu, submenu), auth in existing_map.items():
+                if (menu, submenu) not in checked:
+                    auth.delete()
+
+            messages.success(request, "Authorities updated successfully.")
+            return redirect('authority_assign_with_pk', pk=selected_user.saas_user_id)
+
+        elif 'add_new_user_submit' in request.POST:
+            new_username = request.POST.get('add_new_user')
+            
+            
+            is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+            
+            if not new_username:
+                if is_ajax:
+                    return JsonResponse({'success': False, 'message': 'Please select a user to add.'})
+                else:
+                    messages.error(request, 'Please select a user to add.')
+                    return redirect('authority_assign')
+            
+            try:
+                selected_user = get_object_or_404(SAASUsers, saas_username=new_username)
+                
+                
+                existing_authority = Authority.objects.filter(
+                    business_unit=business_unit, 
+                    saas_username=new_username
+                ).exists()
+                
+                if existing_authority:
+                    if is_ajax:
+                        return JsonResponse({
+                            'success': False, 
+                            'message': f'User {new_username} is already in the authority system.'
+                        })
+                    else:
+                        messages.error(request, f'User {new_username} is already in the authority system.')
+                        return redirect('authority_assign')
+                
+              
+                first_menu_item = menu_items.first() if menu_items.exists() else None
+                if first_menu_item:
+                    current_time = timezone.now()
+                    current_date_str = current_time.strftime('%Y-%m-%d')
+                    updater = saas_user.saas_username[:10]
+                    
+                    Authority.objects.create(
+                        business_unit=business_unit,
+                        au_type='TREEVIEW',
+                        saas_username=selected_user.saas_username,
+                        au_menu=first_menu_item['au_menu'],
+                        au_submenu=first_menu_item['au_submenu'],
+                        au_menu_text=first_menu_item['au_menu_text'],
+                        au_submenu_text=first_menu_item['au_submenu_text'],
+                        au_status=True,  
+                        au_create_dt=current_time.date(),
+                        au_create_tm=current_time,
+                        au_create_by=updater,
+                        au_create_remarks=f"User added to system on {current_date_str} by {updater}",
+                        au_update_dt='1900-01-01',
+                        au_update_tm='1900-01-01',
+                        au_update_by='',
+                        au_update_remarks=''
+                    )
+                
+                if is_ajax:
+                    return JsonResponse({
+                        'success': True, 
+                        'user_id': selected_user.saas_user_id,
+                        'username': selected_user.saas_username,
+                        'message': f'User {new_username} has been added to the authority system.'
+                    })
+                else:
+                    messages.success(request, f'User {new_username} has been added to the authority system.')
+                    return redirect('authority_assign_with_pk', pk=selected_user.saas_user_id)
+                    
+            except Http404:
+                if is_ajax:
+                    return JsonResponse({
+                        'success': False, 
+                        'message': f'User with username "{new_username}" not found.'
+                    })
+                else:
+                    messages.error(request, f'User with username "{new_username}" not found.')
+                    return redirect('authority_assign')
+
+    
+    saas_user_form = SAASUserForm(business_unit_id=business_unit_id, logged_in_username=saas_user.saas_username)
+    
+    
+    authority_users = Authority.objects.filter(business_unit=business_unit).values_list('saas_username', flat=True).distinct()
+    users = SAASUsers.objects.filter(saas_username__in=authority_users).distinct()
+    allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
+    context = {
+        'allowed_menu_items': allowed_menu_items,
+        'username': user.saas_username,
+        'users': users,
+        'menu_items': menu_items,
+        'saas_user_id': saas_user_id,
+        'selected_user': selected_user,
+        'existing_authorities': existing_authorities,
+        'saas_user_form': saas_user_form,
+        'business_unit': business_unit,
+    }
+    return render(request, 'authority_assign.html', context)
+
+
+@login_required
+def authority_add(request):
+    
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+    saas_username = request.session.get('saas_username')
+
+    
+    if not all([saas_user_id, saas_customer_id, business_unit_group_id, business_unit_id, branch_id, saas_username]):
+        logger.error(f"Missing session data: saas_user_id={saas_user_id}, saas_customer_id={saas_customer_id}, "
+                     f"business_unit_group_id={business_unit_group_id}, business_unit_id={business_unit_id}, "
+                     f"branch_id={branch_id}, saas_username={saas_username}")
+        messages.error(request, "Invalid session data. Please log in again.")
+        return redirect('login')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+
+        if request.method == 'POST':
+            form = AuthorityForm(request.POST, business_unit=business_unit)
+            if form.is_valid():
+                authority = form.save(commit=False)
+                authority.au_create_by = user.saas_username[:10]
+                current_time = timezone.now()
+                current_date_str = current_time.strftime('%Y-%m-%d')
+                authority.au_create_remarks = f"Authority created by {user.saas_username} on {current_date_str}"
+                authority.au_update_dt = '1900-01-01'
+                authority.au_update_tm = '1900-01-01'
+                authority.au_update_by = ''
+                authority.au_update_remarks = ''
+                authority.business_unit = business_unit
+                authority.save()
+                logger.info(f"Authority added: {authority.pk}")
+                messages.success(request, "Authority added successfully.")
+                return redirect('authority_list')
+        else:
+            form = AuthorityForm(business_unit=business_unit)
+
+        context = {
+            'form': form,
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'app_label': 'pos',
+        }
+        return render(request, 'authority_add.html', context)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist,
+            BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in authority_add: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+
+@login_required
+def authority_edit(request, pk):
+    
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+    saas_username = request.session.get('saas_username')
+
+    
+    if not all([saas_user_id, saas_customer_id, business_unit_group_id, business_unit_id, branch_id, saas_username]):
+        logger.error(f"Missing session data: saas_user_id={saas_user_id}, saas_customer_id={saas_customer_id}, "
+                     f"business_unit_group_id={business_unit_group_id}, business_unit_id={business_unit_id}, "
+                     f"branch_id={branch_id}, saas_username={saas_username}")
+        messages.error(request, "Invalid session data. Please log in again.")
+        return redirect('login')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        authority = get_object_or_404(Authority, pk=pk, business_unit=business_unit)
+
+        if request.method == 'POST':
+            form = AuthorityForm(request.POST, instance=authority, business_unit=business_unit)
+            if form.is_valid():
+                authority = form.save(commit=False)
+                changed_fields = []
+                field_display_names = {
+                    'au_type': 'Authority Type',
+                    'saas_user_id': 'SaaS User ID',
+                    'au_menu': 'Menu',
+                    'au_submenu': 'Submenu',
+                    'au_menu_text': 'Menu Text',
+                    'au_submenu_text': 'Submenu Text',
+                    'au_status': 'Status',
+                }
+                for field in form.changed_data:
+                    changed_fields.append(field_display_names.get(field, field))
+                authority.au_update_dt = timezone.now().date()
+                authority.au_update_tm = timezone.now()
+                authority.au_update_by = user.saas_username[:10]
+                authority.au_update_remarks = (
+                    f"Updated on {timezone.now().date().strftime('%Y-%m-%d')} by {user.saas_username[:10]}. "
+                    f"Fields changed: {', '.join(changed_fields)}" if changed_fields
+                    else f"Form submitted on {timezone.now().date().strftime('%Y-%m-%d')} by {user.saas_username[:10]} with no field changes"
+                )[:250]
+                authority.save()
+                logger.info(f"Authority updated: {authority.pk}")
+                messages.success(request, "Authority updated successfully.")
+                return redirect('authority_list')
+        else:
+            form = AuthorityForm(instance=authority, business_unit=business_unit)
+
+        context = {
+            'form': form,
+            'authority': authority,
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'app_label': 'pos',
+        }
+        return render(request, 'authority_edit.html', context)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist,
+            BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in authority_edit: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+
+@login_required
+def authority_list(request):
+    
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+    saas_username = request.session.get('saas_username')
+
+    
+    if not all([saas_user_id, saas_customer_id, business_unit_group_id, business_unit_id, branch_id, saas_username]):
+        logger.error(f"Missing session data: saas_user_id={saas_user_id}, saas_customer_id={saas_customer_id}, "
+                     f"business_unit_group_id={business_unit_group_id}, business_unit_id={business_unit_id}, "
+                     f"branch_id={branch_id}, saas_username={saas_username}")
+        messages.error(request, "Invalid session data. Please log in again.")
+        return redirect('login')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
+        
+        users = SAASUsers.objects.filter(
+            saas_username__in=Authority.objects.filter(business_unit=business_unit).values('saas_username')
+        ).distinct().order_by('saas_username')
+
+        context = {
+            'users': users,
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'app_label': 'pos',
+            'allowed_menu_items': allowed_menu_items,
+        }
+        return render(request, 'authority_list.html', context)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist,
+            BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in authority_list: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+
+@login_required
+def authority_delete(request, pk):
+    
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+    saas_username = request.session.get('saas_username')
+
+    
+    if not all([saas_user_id, saas_customer_id, business_unit_group_id, business_unit_id, branch_id, saas_username]):
+        logger.error(f"Missing session data: saas_user_id={saas_user_id}, saas_customer_id={saas_customer_id}, "
+                     f"business_unit_group_id={business_unit_group_id}, business_unit_id={business_unit_id}, "
+                     f"branch_id={branch_id}, saas_username={saas_username}")
+        messages.error(request, "Invalid session data. Please log in again.")
+        return redirect('login')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        authority = get_object_or_404(Authority, pk=pk, business_unit=business_unit)
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
+        if request.method == 'POST':
+            authority_id = authority.pk
+            authority.delete()
+            logger.info(f"Authority deleted: {authority_id}")
+            messages.success(request, "Authority deleted successfully.")
+            return redirect('authority_list')
+
+        context = {
+            'object': authority,
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'app_label': 'pos',
+            'allowed_menu_items': allowed_menu_items,
+        }
+        return render(request, 'authority_confirm_delete.html', context)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist,
+            BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in authority_delete: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+
+@login_required
+def authority_inquiry(request):
+    
+    saas_user_id = request.session.get('saas_user_id')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+    saas_username = request.session.get('saas_username')
+
+    
+    if not all([saas_user_id, saas_customer_id, business_unit_group_id, business_unit_id, branch_id, saas_username]):
+        logger.error(f"Missing session data: saas_user_id={saas_user_id}, saas_customer_id={saas_customer_id}, "
+                     f"business_unit_group_id={business_unit_group_id}, business_unit_id={business_unit_id}, "
+                     f"branch_id={branch_id}, saas_username={saas_username}")
+        messages.error(request, "Invalid session data. Please log in again.")
+        return redirect('login')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+
+        
+        authorities = Authority.objects.filter(business_unit=business_unit).order_by('-au_create_dt')
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
+
+        context = {
+            'authorities': authorities,
+            'username': user.saas_username,
+            'saas_customer': saas_customer,
+            'business_unit_group': business_unit_group,
+            'business_unit': business_unit,
+            'branch': branch,
+            'app_label': 'pos',
+            'allowed_menu_items': allowed_menu_items,
+        }
+        return render(request, 'authority_inquiry.html', context)
+    except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist, BusinessUnitGroup.DoesNotExist,
+            BusinessUnit.DoesNotExist, Branch.DoesNotExist) as e:
+        logger.error(f"Error in authority_inquiry: {str(e)}")
+        messages.error(request, f"Invalid session data: {str(e)}")
+        return redirect('login')
+    
+
+
+
+
+@login_required
+def productgroup_add(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)  
+        
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+    except SAASUsers.DoesNotExist:
+        messages.error(request, "Invalid user session.")
+        return redirect('login')
+
+    if request.method == 'POST':
+        form = ProductGroupForm(request.POST, request.FILES)
+        if form.is_valid():
+            product_group = form.save(commit=False)
+            product_group.business_unit = business_unit
+            product_group.create_by = saas_user.saas_username[:10]  
+            product_group.create_remarks = f"Created by {saas_user.saas_username} for product {form.cleaned_data['product_name']}"[:200]  
+            product_group.save()
+            messages.success(request, "Product Group added successfully.")
+            return redirect('productgroup_list')
+    else:
+        form = ProductGroupForm()
+
+    context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,
+        'form': form,
+    }
+    return render(request, 'productgroup_add.html', context)
+
+
+
+@login_required
+def productgroup_edit(request, pk):
+    business_unit_id = request.session.get('business_unit_id')
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)    
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)  
+        product_group = get_object_or_404(ProductGroup, pk=pk, business_unit__business_unit_id=business_unit_id)
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+    except SAASUsers.DoesNotExist:
+        messages.error(request, "Invalid user session.")
+        return redirect('login')
+
+    if request.method == 'POST':
+        form = EditProductGroupForm(request.POST, request.FILES, instance=product_group)
+        if form.is_valid():
+            product_group = form.save(commit=False)
+
+            changed_fields = []
+            for field in form.changed_data:
+                if field == 'product_name':
+                    changed_fields.append('Product Name')
+                elif field == 'product_image':
+                    changed_fields.append('Product Image')
+
+            
+            if 'clear_image' in request.POST and product_group.product_image:
+                product_group.product_image.delete()
+                product_group.product_image = None
+                changed_fields.append('Product Image (cleared)')
+
+            product_group.update_dt = date.today()
+            product_group.update_tm = timezone.now()  
+            product_group.update_by = saas_user.saas_username[:10]  
+            product_group.update_marks = f"Updated: {', '.join(changed_fields)}" if changed_fields else "No fields changed"
+
+            product_group.business_unit = business_unit
+            product_group.save()
+            messages.success(request, "Product Group updated successfully.")
+            return redirect('productgroup_list')
+    else:
+        form = EditProductGroupForm(instance=product_group)
+
+    context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,
+        'form': form,
+        'product_group': product_group,
+    }
+    return render(request, 'productgroup_edit.html', context)
+
+
+
+
+@login_required
+def productgroup_list(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+
+        product_groups = ProductGroup.objects.filter(business_unit=business_unit).order_by('-create_dt')
+        paginator = Paginator(product_groups, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,
+        'page_obj': page_obj,
+        
+        }
+        return render(request, 'productgroup_list.html', context)
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+
+@login_required
+def productgroup_delete(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+        product_group = get_object_or_404(ProductGroup, pk=pk, business_unit__business_unit_id=business_unit_id)
+        if request.method == 'POST':
+            product_group.delete()
+            messages.success(request, "Product Group deleted successfully.")
+            return redirect('productgroup_list')
+        
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,
+        'object': product_group
+        
+        }
+        
+        return render(request, 'productgroup_confirm_delete.html', context)
+    except Exception as e:
+        messages.error(request, f"Error: {str(e)}")
+        return redirect('productgroup_list')
+    
+
+
+@login_required
+def productgroup_inquiry(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+        product_groups = ProductGroup.objects.filter(business_unit=business_unit)
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,
+        'product_groups': product_groups,
+        
+        }
+
+        return render(request, 'productgroup_inquiry.html', context)
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+
+@login_required
+def productgroup_dashboard(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+        product_group_count = ProductGroup.objects.filter(business_unit=business_unit).count()
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,
+        'product_group_count': product_group_count,
+        
+        }
+        return render(request, 'productgroup_dashboard.html', context)
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+
+
+
+
+
+
+
+@login_required
+def product_add(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+    except SAASUsers.DoesNotExist:
+        messages.error(request, "Invalid user session.")
+        return redirect('login')
+
+    if request.method == 'POST':
+        form = ProductForm(request.POST, request.FILES, business_unit=business_unit)
+        if form.is_valid():
+            product = form.save(commit=False)
+            product.business_unit = business_unit
+            product.create_by = saas_user.saas_username  
+    
+            current_date = timezone.now().strftime('%Y-%m-%d')
+            product.create_remarks = f"Product created by {saas_user.saas_username} on {current_date}"
+        
+            product.update_dt = '1900-01-01'  
+            product.update_tm = '1900-01-01'  
+            product.update_by = ''  
+            product.update_marks = ''  
+            product.save()
+            messages.success(request, "Product added successfully.")
+            return redirect('product_list')
+    else:
+        form = ProductForm(business_unit=business_unit)
+
+    context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,
+        'form': form,
+        
+        }    
+    return render(request, 'product_add.html', context)
+
+
+
+
+
+
+
+@login_required
+def product_edit(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        product = get_object_or_404(Products, pk=pk, business_unit__business_unit_id=business_unit_id)
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+    except SAASUsers.DoesNotExist:
+        messages.error(request, "Invalid user session.")
+        return redirect('login')
+
+    if request.method == 'POST':
+        form = ProductForm(request.POST, request.FILES, instance=product, business_unit=business_unit)
+        if form.is_valid():
+            product = form.save(commit=False)
+
+            changed_fields = []
+            field_display_names = {
+                'product_group': 'Product Group',
+                'category': 'Category',
+                'product_name': 'Product Name',
+                'product_image': 'Product Image',
+                'product_price': 'Product Price',
+                'sale_price': 'Sale Price',
+                'unit_cost': 'Unit Cost',
+                'discount': 'Discount',
+                'tax': 'Tax',
+                'stock': 'Stock',
+                'flag_stock_out': 'Stock Out Flag',
+                'uom': 'Unit of Measure',
+                'sku': 'SKU',
+                'inv_class': 'Inventory Class',
+            }
+            for field in form.changed_data:
+                changed_fields.append(field_display_names.get(field, field))
+
+            
+            if 'clear_image' in request.POST and product.product_image:
+                product.product_image.delete(save=False)
+                product.product_image = None
+                changed_fields.append('Product Image (cleared)')
+
+    
+            product.update_dt = date.today()
+            product.update_tm = timezone.now()  
+            product.update_by = saas_user.saas_username[:10]  
+            product.update_marks = (
+                f"Updated on {date.today().strftime('%Y-%m-%d')} by {saas_user.saas_username[:10]}. "
+                f"Fields changed: {', '.join(changed_fields)}" if changed_fields
+                else f"Form submitted on {date.today().strftime('%Y-%m-%d')} by {saas_user.saas_username[:10]} with no field changes"
+            )[:200]  
+
+            product.business_unit = business_unit
+            product.save()
+            messages.success(request, "Product updated successfully.")
+            return redirect('product_list')
+    else:
+        form = ProductForm(instance=product, business_unit=business_unit)
+
+    context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,
+        'form': form,
+        'product': product,
+        
+        }    
+
+    return render(request, 'product_edit.html', context)
+
+
+
+@login_required
+def product_list(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+        products = Products.objects.filter(business_unit=business_unit).order_by('-create_dt')
+        paginator = Paginator(products, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+        
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,
+        'page_obj': page_obj,
+        
+        }
+        return render(request, 'product_list.html', context)
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+
+@login_required
+def product_delete(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+        product = get_object_or_404(Products, pk=pk, business_unit__business_unit_id=business_unit_id)
+        if request.method == 'POST':
+            product.delete()
+            messages.success(request, "Product deleted successfully.")
+            return redirect('product_list')
+        
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,
+        'object': product,
+        
+        }
+
+        return render(request, 'product_confirm_delete.html', context)
+    except Exception as e:
+        messages.error(request, f"Error: {str(e)}")
+        return redirect('product_list')
+
+@login_required
+def product_inquiry(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+        products = Products.objects.filter(business_unit=business_unit)
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,
+        'products': products,
+        
+        }
+
+        
+        return render(request, 'product_inquiry.html', context)
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+
+@login_required
+def product_dashboard(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+        product_count = Products.objects.filter(business_unit=business_unit).count()
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,
+        'product_count': product_count,
+        
+        }
+
+        return render(request, 'product_dashboard.html', context)
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+
+
+
+
+@login_required
+def supplier_add(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+    except SAASUsers.DoesNotExist:
+        messages.error(request, "Invalid user session.")
+        return redirect('login')
+
+    if request.method == 'POST':
+        form = SupplierForm(request.POST)
+        if form.is_valid():
+            supplier = form.save(commit=False)
+            supplier.business_unit = business_unit
+            supplier.create_by = saas_user.saas_username[:10]
+            supplier.create_remarks = f"Created by {saas_user.saas_username} for supplier {form.cleaned_data['supplier_name']}"[:200]
+            supplier.save()
+            messages.success(request, "Supplier added successfully.")
+            return redirect('supplier_list')
+    else:
+        form = SupplierForm()
+
+    context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,
+        'form': form,
+        
+        
+        }        
+
+    return render(request, 'supplier_add.html', context)
+
+
+
+@login_required
+def supplier_edit(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+        saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        supplier = get_object_or_404(Suppliers, pk=pk, business_unit__business_unit_id=business_unit_id)
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+    except SAASUsers.DoesNotExist:
+        messages.error(request, "Invalid user session.")
+        return redirect('login')
+
+    if request.method == 'POST':
+        form = EditSupplierForm(request.POST, instance=supplier)
+        if form.is_valid():
+            supplier = form.save(commit=False)
+            changed_fields = [field for field in form.changed_data]
+            field_names = {
+                'supplier_type': 'Supplier Type',
+                'supplier_name': 'Supplier Name',
+                'phone_1': 'Primary Phone',
+                'phone_2': 'Secondary Phone',
+                'email': 'Email',
+                'address': 'Address'
+            }
+            changed_labels = [field_names.get(field, field) for field in changed_fields]
+            supplier.update_dt = date.today()
+            supplier.update_tm = timezone.now()
+            supplier.update_by = saas_user.saas_username[:10]
+            supplier.update_marks = f"Updated: {', '.join(changed_labels)}" if changed_labels else "No fields changed"
+            supplier.business_unit = business_unit
+            supplier.save()
+            messages.success(request, "Supplier updated successfully.")
+            return redirect('supplier_list')
+    else:
+        form = EditSupplierForm(instance=supplier)
+
+    context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,
+        'form': form,
+        'supplier': supplier,        
+        
+        }           
+
+    return render(request, 'supplier_edit.html', context)
+
+@login_required
+def supplier_list(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+        suppliers = Suppliers.objects.filter(business_unit=business_unit).order_by('-create_dt')
+        paginator = Paginator(suppliers, 10)
+        page_number = request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,
+        'page_obj': page_obj,        
+        
+        }
+
+        
+        return render(request, 'supplier_list.html', context)
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+
+@login_required
+def supplier_delete(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+        supplier = get_object_or_404(Suppliers, pk=pk, business_unit__business_unit_id=business_unit_id)
+        if request.method == 'POST':
+            supplier.delete()
+            messages.success(request, "Supplier deleted successfully.")
+            return redirect('supplier_list')
+        
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,
+        'object': supplier,        
+        
+        }
+        return render(request, 'supplier_confirm_delete.html', context)
+    except Exception as e:
+        messages.error(request, f"Error: {str(e)}")
+        return redirect('supplier_list')
+
+@login_required
+def supplier_inquiry(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+        suppliers = Suppliers.objects.filter(business_unit=business_unit)
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,
+        'suppliers': suppliers,       
+        
+        }
+        return render(request, 'supplier_inquiry.html', context)
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+
+@login_required
+def supplier_dashboard(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
+    try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
+        supplier_count = Suppliers.objects.filter(business_unit=business_unit).count()
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,
+        'supplier_count': supplier_count,      
+        
+        }
+        return render(request, 'supplier_dashboard.html', context)
+    except BusinessUnit.DoesNotExist:
+        messages.error(request, "Invalid business unit.")
+        return redirect('admin_view')
+
 @login_required
 def saasuser_list(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         saasusers = SAASUsers.objects.filter(saas_customer=saas_user.saas_customer).order_by('-create_dt')
         paginator = Paginator(saasusers, 10)
         page_number = request.GET.get('page')
         page_obj = paginator.get_page(page_number)
-        return render(request, 'saasuser_list.html', {'page_obj': page_obj})
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,
+        'page_obj': page_obj,    
+        
+        }
+
+        return render(request, 'saasuser_list.html', context)
     except SAASUsers.DoesNotExist:
         messages.error(request, "Invalid user session.")
         return redirect('login')
@@ -5083,14 +7478,46 @@ def saasuser_list(request):
 @login_required
 def saasuser_delete(request, pk):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         saasuser = get_object_or_404(SAASUsers, pk=pk, saas_customer=saas_user.saas_customer)
         if request.method == 'POST':
             saasuser.delete()
             messages.success(request, "User deleted successfully.")
             return redirect('saasuser_list')
-        return render(request, 'saasuser_confirm_delete.html', {'object': saasuser})
+        
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,
+        'object': saasuser,  
+        
+        }
+
+        return render(request, 'saasuser_confirm_delete.html', context)
     except Exception as e:
         messages.error(request, f"Error: {str(e)}")
         return redirect('saasuser_list')
@@ -5098,10 +7525,41 @@ def saasuser_delete(request, pk):
 @login_required
 def saasuser_inquiry(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         saasusers = SAASUsers.objects.filter(saas_customer=saas_user.saas_customer)
-        return render(request, 'saasuser_inquiry.html', {'saasusers': saasusers})
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,
+        'saasusers': saasusers, 
+        
+        }
+        return render(request, 'saasuser_inquiry.html', context)
     except SAASUsers.DoesNotExist:
         messages.error(request, "Invalid user session.")
         return redirect('login')
@@ -5109,20 +7567,64 @@ def saasuser_inquiry(request):
 @login_required
 def saasuser_dashboard(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         saasuser_count = SAASUsers.objects.filter(saas_customer=saas_user.saas_customer).count()
-        return render(request, 'saasuser_dashboard.html', {'saasuser_count': saasuser_count})
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'saasuser_count': saasuser_count,
+        
+        }
+
+
+        return render(request, 'saasuser_dashboard.html', context)
     except SAASUsers.DoesNotExist:
         messages.error(request, "Invalid user session.")
         return redirect('login')
 
 @login_required
 def category_add(request):
-    business_unit_id = request.session.get('business_unit_id')
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
     except BusinessUnit.DoesNotExist:
         messages.error(request, "Invalid business unit.")
@@ -5147,14 +7649,44 @@ def category_add(request):
             return redirect('category_list')
     else:
         form = CategoryForm(business_unit=business_unit)
-    return render(request, 'category_add.html', {'form': form})
+
+    context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'form': form,
+        
+        }
+        
+    return render(request, 'category_add.html', context)
 
 @login_required
 def category_edit(request, pk):
-    business_unit_id = request.session.get('business_unit_id')
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         category = get_object_or_404(Category, pk=pk, business_unit_id=business_unit_id)
     except BusinessUnit.DoesNotExist:
@@ -5189,54 +7721,200 @@ def category_edit(request, pk):
             return redirect('category_list')
     else:
         form = CategoryForm(instance=category, business_unit=business_unit)
-    return render(request, 'category_edit.html', {'form': form, 'category': category})
+
+    context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'form': form,
+        'category': category,
+        
+        }    
+    return render(request, 'category_edit.html', context)
 
 @login_required
 def category_list(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         categories = Category.objects.filter(business_unit_id=business_unit_id).order_by('-create_dt')
         paginator = Paginator(categories, 10)
         page_number = request.GET.get('page')
         page_obj = paginator.get_page(page_number)
-        return render(request, 'category_list.html', {'page_obj': page_obj})
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'page_obj': page_obj,
+        
+        }
+
+        return render(request, 'category_list.html', context)
     except BusinessUnit.DoesNotExist:
         messages.error(request, "Invalid business unit.")
         return redirect('admin_view')
 
 @login_required
 def category_delete(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         category = get_object_or_404(Category, pk=pk, business_unit_id=business_unit_id)
         if request.method == 'POST':
             category.delete()
             messages.success(request, "Category deleted successfully.")
             return redirect('category_list')
-        return render(request, 'category_confirm_delete.html', {'object': category})
+        
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'object': category,
+        
+        }
+
+        return render(request, 'category_confirm_delete.html', context)
     except Exception as e:
         messages.error(request, f"Error: {str(e)}")
         return redirect('category_list')
 
 @login_required
 def category_inquiry(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         categories = Category.objects.filter(business_unit_id=business_unit_id)
-        return render(request, 'category_inquiry.html', {'categories': categories})
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'categories': categories,
+        
+        }
+
+
+        return render(request, 'category_inquiry.html', context)
     except BusinessUnit.DoesNotExist:
         messages.error(request, "Invalid business unit.")
         return redirect('admin_view')
 
 @login_required
 def category_dashboard(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         category_count = Category.objects.filter(business_unit_id=business_unit_id).count()
-        return render(request, 'category_dashboard.html', {'category_count': category_count})
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'category_count': category_count
+        
+        }
+
+
+        return render(request, 'category_dashboard.html', context)
     except BusinessUnit.DoesNotExist:
         messages.error(request, "Invalid business unit.")
         return redirect('admin_view')
@@ -5245,13 +7923,46 @@ def category_dashboard(request):
 @login_required
 def businessunitgroup_list(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         groups = BusinessUnitGroup.objects.filter(saas_customer=saas_user.saas_customer).order_by('-create_dt')
         paginator = Paginator(groups, 10)
         page_number = request.GET.get('page')
         page_obj = paginator.get_page(page_number)
-        return render(request, 'businessunitgroup_list.html', {'page_obj': page_obj})
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'page_obj': page_obj,
+        
+        }
+
+
+        return render(request, 'businessunitgroup_list.html', context)
     except SAASUsers.DoesNotExist:
         messages.error(request, "Invalid user session.")
         return redirect('login')
@@ -5259,14 +7970,45 @@ def businessunitgroup_list(request):
 @login_required
 def businessunitgroup_delete(request, pk):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         group = get_object_or_404(BusinessUnitGroup, pk=pk, saas_customer=saas_user.saas_customer)
         if request.method == 'POST':
             group.delete()
             messages.success(request, "Business Unit Group deleted successfully.")
             return redirect('businessunitgroup_list')
-        return render(request, 'businessunitgroup_confirm_delete.html', {'object': group})
+        
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'object': group,
+        
+        }
+        return render(request, 'businessunitgroup_confirm_delete.html', context)
     except Exception as e:
         messages.error(request, f"Error: {str(e)}")
         return redirect('businessunitgroup_list')
@@ -5274,10 +8016,42 @@ def businessunitgroup_delete(request, pk):
 @login_required
 def businessunitgroup_inquiry(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         groups = BusinessUnitGroup.objects.filter(saas_customer=saas_user.saas_customer)
-        return render(request, 'businessunitgroup_inquiry.html', {'businessunitgroups': groups})
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'businessunitgroups': groups
+        
+        }
+
+        return render(request, 'businessunitgroup_inquiry.html', context)
     except SAASUsers.DoesNotExist:
         messages.error(request, "Invalid user session.")
         return redirect('login')
@@ -5285,26 +8059,89 @@ def businessunitgroup_inquiry(request):
 @login_required
 def businessunitgroup_dashboard(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         group_count = BusinessUnitGroup.objects.filter(saas_customer=saas_user.saas_customer).count()
-        return render(request, 'businessunitgroup_dashboard.html', {'businessunitgroup_count': group_count})
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'businessunitgroup_count': group_count,
+        
+        }
+
+
+        return render(request, 'businessunitgroup_dashboard.html', context)
     except SAASUsers.DoesNotExist:
         messages.error(request, "Invalid user session.")
         return redirect('login')
 
-
-
 @login_required
 def businessunit_list(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         businessunits = BusinessUnit.objects.filter(business_unit_group__saas_customer=saas_user.saas_customer).order_by('-create_dt')
         paginator = Paginator(businessunits, 10)
         page_number = request.GET.get('page')
         page_obj = paginator.get_page(page_number)
-        return render(request, 'businessunit_list.html', {'page_obj': page_obj})
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'page_obj': page_obj,
+        
+        }
+
+        return render(request, 'businessunit_list.html', context)
     except SAASUsers.DoesNotExist:
         messages.error(request, "Invalid user session.")
         return redirect('login')
@@ -5312,14 +8149,46 @@ def businessunit_list(request):
 @login_required
 def businessunit_delete(request, pk):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         businessunit = get_object_or_404(BusinessUnit, pk=pk, business_unit_group__saas_customer=saas_user.saas_customer)
         if request.method == 'POST':
             businessunit.delete()
             messages.success(request, "Business Unit deleted successfully.")
             return redirect('businessunit_list')
-        return render(request, 'businessunit_confirm_delete.html', {'object': businessunit})
+        
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'object': businessunit,
+        
+        }
+
+        return render(request, 'businessunit_confirm_delete.html', context)
     except Exception as e:
         messages.error(request, f"Error: {str(e)}")
         return redirect('businessunit_list')
@@ -5327,10 +8196,43 @@ def businessunit_delete(request, pk):
 @login_required
 def businessunit_inquiry(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         businessunits = BusinessUnit.objects.filter(business_unit_group__saas_customer=saas_user.saas_customer)
-        return render(request, 'businessunit_inquiry.html', {'businessunits': businessunits})
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'businessunits': businessunits,
+        
+        }
+
+
+        return render(request, 'businessunit_inquiry.html', context)
     except SAASUsers.DoesNotExist:
         messages.error(request, "Invalid user session.")
         return redirect('login')
@@ -5338,123 +8240,427 @@ def businessunit_inquiry(request):
 @login_required
 def businessunit_dashboard(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         businessunit_count = BusinessUnit.objects.filter(business_unit_group__saas_customer=saas_user.saas_customer).count()
-        return render(request, 'businessunit_dashboard.html', {'businessunit_count': businessunit_count})
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'businessunit_count': businessunit_count,
+        
+        }
+
+
+        return render(request, 'businessunit_dashboard.html', context)
     except SAASUsers.DoesNotExist:
         messages.error(request, "Invalid user session.")
         return redirect('login')
 
 
-
 @login_required
 def branch_list(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branches = Branch.objects.filter(business_unit=business_unit).order_by('-create_dt')
         paginator = Paginator(branches, 10)
         page_number = request.GET.get('page')
         page_obj = paginator.get_page(page_number)
-        return render(request, 'branch_list.html', {'page_obj': page_obj})
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'page_obj': page_obj,
+        
+        }
+
+        return render(request, 'branch_list.html', context)
     except BusinessUnit.DoesNotExist:
         messages.error(request, "Invalid business unit.")
         return redirect('admin_view')
 
 @login_required
 def branch_delete(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         branch = get_object_or_404(Branch, pk=pk, business_unit__business_unit_id=business_unit_id)
         if request.method == 'POST':
             branch.delete()
             messages.success(request, "Branch deleted successfully.")
             return redirect('branch_list')
-        return render(request, 'branch_confirm_delete.html', {'object': branch})
+        
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'object': branch,
+        
+        }
+
+        return render(request, 'branch_confirm_delete.html', context)
     except Exception as e:
         messages.error(request, f"Error: {str(e)}")
         return redirect('branch_list')
 
 @login_required
 def branch_inquiry(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branches = Branch.objects.filter(business_unit=business_unit)
-        return render(request, 'branch_inquiry.html', {'branches': branches})
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'branches': branches,
+        
+        }
+
+        return render(request, 'branch_inquiry.html', context)
     except BusinessUnit.DoesNotExist:
         messages.error(request, "Invalid business unit.")
         return redirect('admin_view')
 
 @login_required
 def branch_dashboard(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch_count = Branch.objects.filter(business_unit=business_unit).count()
-        return render(request, 'branch_dashboard.html', {'branch_count': branch_count})
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'branch_count': branch_count,
+        
+        }
+
+
+        return render(request, 'branch_dashboard.html', context)
     except BusinessUnit.DoesNotExist:
         messages.error(request, "Invalid business unit.")
         return redirect('admin_view')
 
-
 @login_required
 def warehouse_list(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         warehouses = Warehouse.objects.filter(business_unit=business_unit).order_by('-create_dt')
         paginator = Paginator(warehouses, 10)
         page_number = request.GET.get('page')
         page_obj = paginator.get_page(page_number)
-        return render(request, 'warehouse_list.html', {'page_obj': page_obj})
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'page_obj': page_obj,
+        
+        }
+
+
+        return render(request, 'warehouse_list.html', context)
     except BusinessUnit.DoesNotExist:
         messages.error(request, "Invalid business unit.")
         return redirect('admin_view')
 
 @login_required
 def warehouse_delete(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         warehouse = get_object_or_404(Warehouse, pk=pk, business_unit__business_unit_id=business_unit_id)
         if request.method == 'POST':
             warehouse.delete()
             messages.success(request, "Warehouse deleted successfully.")
             return redirect('warehouse_list')
-        return render(request, 'warehouse_confirm_delete.html', {'object': warehouse})
+        
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'object': warehouse,
+        
+        }
+        return render(request, 'warehouse_confirm_delete.html', context)
     except Exception as e:
         messages.error(request, f"Error: {str(e)}")
         return redirect('warehouse_list')
 
 @login_required
 def warehouse_inquiry(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         warehouses = Warehouse.objects.filter(business_unit=business_unit)
-        return render(request, 'warehouse_inquiry.html', {'warehouses': warehouses})
+        
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'warehouses': warehouses,
+        
+        }
+
+
+        return render(request, 'warehouse_inquiry.html', context)
     except BusinessUnit.DoesNotExist:
         messages.error(request, "Invalid business unit.")
         return redirect('admin_view')
 
 @login_required
 def warehouse_dashboard(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         warehouse_count = Warehouse.objects.filter(business_unit=business_unit).count()
-        return render(request, 'warehouse_dashboard.html', {'warehouse_count': warehouse_count})
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'warehouse_count': warehouse_count
+        
+        }
+
+
+        return render(request, 'warehouse_dashboard.html', context)
     except BusinessUnit.DoesNotExist:
         messages.error(request, "Invalid business unit.")
         return redirect('admin_view')
 
+
+
+
 @login_required
 def customer_add(request):
-    business_unit_id = request.session.get('business_unit_id')
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
     except BusinessUnit.DoesNotExist:
         messages.error(request, "Invalid business unit.")
@@ -5462,31 +8668,77 @@ def customer_add(request):
     except SAASUsers.DoesNotExist:
         messages.error(request, "Invalid user session.")
         return redirect('login')
+    
     if request.method == 'POST':
         form = CustomerForm(request.POST, business_unit=business_unit)
         if form.is_valid():
             customer = form.save(commit=False)
             customer.business_unit = business_unit
-            customer.create_by = saas_user.saas_username
-            current_date = timezone.now().strftime('%Y-%m-%d')
-            customer.create_remarks = f"Customer created by {saas_user.saas_username} on {current_date}"
-            customer.update_dt = '1900-01-01'
-            customer.update_tm = '1900-01-01'
+            customer.create_by = saas_user.saas_username[:10]  # Limit to 10 chars
+            current_date = timezone.now().date()
+            customer.create_remarks = f"Customer created by {saas_user.saas_username[:10]} on {current_date}"
+            
+            # Set default update values
+            customer.update_dt = timezone.datetime(1900, 1, 1).date()
+            customer.update_tm = timezone.make_aware(
+                timezone.datetime(1900, 1, 1, 0, 0, 0), 
+                timezone=pytz.UTC
+            )
             customer.update_by = ''
             customer.update_marks = ''
+            
+            # Save with blank fields
             customer.save()
+            
             messages.success(request, "Customer added successfully.")
             return redirect('customer_list')
+        else:
+            # Show form errors
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f"{field}: {error}")
     else:
         form = CustomerForm(business_unit=business_unit)
-    return render(request, 'customer_add.html', {'form': form})
+
+    context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'form': form,
+        
+        }    
+    
+    return render(request, 'customer_add.html', context)
+
+
 
 @login_required
 def customer_edit(request, pk):
-    business_unit_id = request.session.get('business_unit_id')
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         customer = get_object_or_404(Customer, pk=pk, business_unit__business_unit_id=business_unit_id)
     except BusinessUnit.DoesNotExist:
@@ -5506,6 +8758,9 @@ def customer_edit(request, pk):
                 'phone_2': 'Phone 2',
                 'email': 'Email',
                 'address': 'Address',
+                'aadhaar_card_no': 'Aadhaar Card Number',
+                'national_id': 'National ID',
+                'passport_no': 'Passport Number',
             }
             for field in form.changed_data:
                 changed_fields.append(field_display_names.get(field, field))
@@ -5523,54 +8778,205 @@ def customer_edit(request, pk):
             return redirect('customer_list')
     else:
         form = CustomerForm(instance=customer, business_unit=business_unit)
-    return render(request, 'customer_edit.html', {'form': form, 'customer': customer})
+
+
+    context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'form': form,
+        'customer': customer,
+        
+        }
+
+
+    return render(request, 'customer_edit.html', context)
 
 @login_required
 def customer_list(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         customers = Customer.objects.filter(business_unit=business_unit).order_by('-create_dt')
         paginator = Paginator(customers, 10)
         page_number = request.GET.get('page')
         page_obj = paginator.get_page(page_number)
-        return render(request, 'customer_list.html', {'page_obj': page_obj})
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'page_obj': page_obj,
+        
+        }
+
+
+        return render(request, 'customer_list.html', context)
     except BusinessUnit.DoesNotExist:
         messages.error(request, "Invalid business unit.")
         return redirect('admin_view')
 
 @login_required
 def customer_delete(request, pk):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         customer = get_object_or_404(Customer, pk=pk, business_unit__business_unit_id=business_unit_id)
         if request.method == 'POST':
             customer.delete()
             messages.success(request, "Customer deleted successfully.")
             return redirect('customer_list')
-        return render(request, 'customer_confirm_delete.html', {'object': customer})
+        
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'object': customer,
+        
+        }
+
+        return render(request, 'customer_confirm_delete.html', context)
     except Exception as e:
         messages.error(request, f"Error: {str(e)}")
         return redirect('customer_list')
 
 @login_required
 def customer_inquiry(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         customers = Customer.objects.filter(business_unit=business_unit)
-        return render(request, 'customer_inquiry.html', {'customers': customers})
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'customers': customers,
+        
+        }
+
+        return render(request, 'customer_inquiry.html', context)
     except BusinessUnit.DoesNotExist:
         messages.error(request, "Invalid business unit.")
         return redirect('admin_view')
 
 @login_required
 def customer_dashboard(request):
+    saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         customer_count = Customer.objects.filter(business_unit=business_unit).count()
-        return render(request, 'customer_dashboard.html', {'customer_count': customer_count})
+
+        context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'customer_count': customer_count,
+        
+        }
+
+
+        return render(request, 'customer_dashboard.html', context)
     except BusinessUnit.DoesNotExist:
         messages.error(request, "Invalid business unit.")
         return redirect('admin_view')        
@@ -5581,8 +8987,20 @@ def customer_dashboard(request):
 @login_required
 def saasuser_add(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist):
@@ -5615,13 +9033,43 @@ def saasuser_add(request):
                 logger.error(f"Error saving user: {str(e)}")
     else:
         form = SAASUsersForm(saas_customer=saas_customer)
-    return render(request, 'saasuser_add.html', {'form': form})
+
+    context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'form': form
+        
+        }    
+    return render(request, 'saasuser_add.html', context)
 
 @login_required
 def saasuser_edit(request, pk):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
         saasuser = get_object_or_404(SAASUsers, pk=pk, saas_customer=saas_customer)
@@ -5657,15 +9105,46 @@ def saasuser_edit(request, pk):
                 logger.error(f"Error updating user: {str(e)}")
     else:
         form = SAASUsersForm(instance=saasuser, saas_customer=saas_customer)
-    return render(request, 'saasuser_edit.html', {'form': form, 'saasuser': saasuser})
+
+    context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'form': form,
+        'saasuser': saasuser,
+        
+        }      
+    return render(request, 'saasuser_edit.html', context)
 
 
 
 @login_required
 def businessunitgroup_add(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist):
@@ -5688,13 +9167,44 @@ def businessunitgroup_add(request):
             return redirect('businessunitgroup_list')
     else:
         form = BusinessUnitGroupForm(saas_customer=saas_customer)
-    return render(request, 'businessunitgroup_add.html', {'form': form})
+
+    context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'form': form,
+        
+        }
+        
+    return render(request, 'businessunitgroup_add.html', context)
 
 @login_required
 def businessunitgroup_edit(request, pk):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
         group = get_object_or_404(BusinessUnitGroup, pk=pk, saas_customer=saas_customer)
@@ -5725,13 +9235,45 @@ def businessunitgroup_edit(request, pk):
             return redirect('businessunitgroup_list')
     else:
         form = BusinessUnitGroupForm(instance=group, saas_customer=saas_customer)
-    return render(request, 'businessunitgroup_edit.html', {'form': form, 'businessunitgroup': group})
+
+    context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'form': form,
+        'businessunitgroup': group
+        
+        }
+            
+    return render(request, 'businessunitgroup_edit.html', context)
 
 @login_required
 def businessunit_add(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
     except (SAASUsers.DoesNotExist, SAASCustomer.DoesNotExist):
@@ -5754,13 +9296,45 @@ def businessunit_add(request):
             return redirect('businessunit_list')
     else:
         form = BusinessUnitForm(saas_customer=saas_customer)
-    return render(request, 'businessunit_add.html', {'form': form})
+
+    context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'form': form,
+        
+        
+        }
+            
+    return render(request, 'businessunit_add.html', context)
 
 @login_required
 def businessunit_edit(request, pk):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
     saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
+    business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
         businessunit = get_object_or_404(BusinessUnit, pk=pk, business_unit_group__saas_customer=saas_customer)
@@ -5797,13 +9371,46 @@ def businessunit_edit(request, pk):
             return redirect('businessunit_list')
     else:
         form = BusinessUnitForm(instance=businessunit, saas_customer=saas_customer)
-    return render(request, 'businessunit_edit.html', {'form': form, 'businessunit': businessunit})
+
+    context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'form': form,
+        'businessunit': businessunit,
+        
+        }
+
+
+    return render(request, 'businessunit_edit.html', context)
 
 @login_required
 def branch_add(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
     except (SAASUsers.DoesNotExist, BusinessUnit.DoesNotExist):
@@ -5826,13 +9433,44 @@ def branch_add(request):
             return redirect('branch_list')
     else:
         form = BranchForm(business_unit=business_unit)
-    return render(request, 'branch_add.html', {'form': form})
+
+    context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'form': form,
+        
+        }
+        
+    return render(request, 'branch_add.html', context)
 
 @login_required
 def branch_edit(request, pk):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = get_object_or_404(Branch, pk=pk, business_unit=business_unit)
@@ -5867,13 +9505,45 @@ def branch_edit(request, pk):
             return redirect('branch_list')
     else:
         form = BranchForm(instance=branch, business_unit=business_unit)
-    return render(request, 'branch_edit.html', {'form': form, 'branch': branch})
+
+    context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'form': form,
+        'branch': branch,
+        
+        }
+        
+    return render(request, 'branch_edit.html', context)
 
 @login_required
 def warehouse_add(request):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
     except (SAASUsers.DoesNotExist, BusinessUnit.DoesNotExist):
@@ -5896,13 +9566,46 @@ def warehouse_add(request):
             return redirect('warehouse_list')
     else:
         form = WarehouseForm(business_unit=business_unit)
-    return render(request, 'warehouse_add.html', {'form': form})
+
+    context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'form': form,
+        
+        
+        }
+
+
+    return render(request, 'warehouse_add.html', context)
 
 @login_required
 def warehouse_edit(request, pk):
     saas_user_id = request.session.get('saas_user_id')
+    saas_username = request.session.get('saas_username')
+    saas_customer_id = request.session.get('saas_customer_id')
+    business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
+    branch_id = request.session.get('branch_id')
+
     try:
+        user = SAASUsers.objects.get(saas_user_id=saas_user_id)
+        saas_customer = SAASCustomer.objects.get(saas_customer_id=saas_customer_id)
+        business_unit_group = BusinessUnitGroup.objects.get(business_unit_group_id=business_unit_group_id)
+        business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+        branch = Branch.objects.get(branch_id=branch_id)
+        vehicle_count = Vehicle.objects.filter(business_unit=business_unit).count()
+        allowed_menu_items = get_allowed_menu_items(saas_username, business_unit_id)
         saas_user = SAASUsers.objects.get(saas_user_id=saas_user_id)
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         warehouse = get_object_or_404(Warehouse, pk=pk, business_unit=business_unit)
@@ -5936,4 +9639,24 @@ def warehouse_edit(request, pk):
             return redirect('warehouse_list')
     else:
         form = WarehouseForm(instance=warehouse, business_unit=business_unit)
-    return render(request, 'warehouse_edit.html', {'form': form, 'warehouse': warehouse})
+
+    context = {
+        'saas_user_id': saas_user_id,
+        'saas_username': saas_username,
+        'saas_customer_id': saas_customer_id,
+        'business_unit_group_id': business_unit_group_id,
+        'business_unit_id': business_unit_id,
+        'branch_id': branch_id,
+        'user': user,
+        'saas_customer': saas_customer,
+        'business_unit_group': business_unit_group,
+        'business_unit': business_unit,
+        'branch': branch,
+        'vehicle_count': vehicle_count,
+        'allowed_menu_items': allowed_menu_items,         
+        'form': form,
+        'warehouse': warehouse,
+        
+        }
+        
+    return render(request, 'warehouse_edit.html', context)

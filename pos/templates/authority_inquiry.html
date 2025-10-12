@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 max-w-7xl">
+    <div class="mb-6">
+        <div class="flex justify-between items-center">
+            <h1 class="text-xl md:text-2xl font-bold text-gray-800">Authority Inquiry</h1>
+            <a href="{% url 'authority_assign' %}" 
+               class="inline-block bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 transition-colors duration-200 text-sm">
+               Add New Authority
+            </a>
+        </div>
+    </div>
+{% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+            <p style="color: {% if message.tags == 'error' %}red{% else %}green{% endif %};">
+                {{ message }}
+            </p>
+        {% endfor %}
+    </div>
+{% endif %}
+
+    <div class="bg-white shadow-md rounded-lg overflow-hidden">
+        <div class="p-4">
+            <h2 class="text-lg font-semibold text-gray-800"><i class="fas fa-search mr-2"></i>Authority Details</h2>
+        </div>
+        <div class="overflow-x-auto">
+            {% if authorities %}
+                <table class="w-full text-sm text-left text-gray-700">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-4 py-2 font-medium">ID</th>
+                            <th class="px-4 py-2 font-medium">Type</th>
+                            <th class="px-4 py-2 font-medium">SaaS User</th>
+                            <th class="px-4 py-2 font-medium">Menu</th>
+                            <th class="px-4 py-2 font-medium">Submenu</th>
+                            <th class="px-4 py-2 font-medium">Status</th>
+                            <th class="px-4 py-2 font-medium">Branch</th>
+                            <th class="px-4 py-2 font-medium">Business Unit</th>
+                            <th class="px-4 py-2 font-medium">Created Date</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200">
+                        {% for authority in authorities %}
+                            <tr class="hover:bg-gray-50 transition-colors duration-150">
+                                <td class="px-4 py-2">{{ authority.pk }}</td>
+                                <td class="px-4 py-2">{{ authority.au_type|default:"N/A" }}</td>
+                                <td class="px-4 py-2">{{ authority.saas_username|default:"N/A" }}</td>
+                                <td class="px-4 py-2">{{ authority.au_menu|default:"N/A" }}</td>
+                                <td class="px-4 py-2">{{ authority.au_submenu|default:"N/A" }}</td>
+                                <td class="px-4 py-2">{{ authority.au_status|default:"N/A" }}</td>
+                                <td class="px-4 py-2">{{ authority.business_unit.branch.branch_name|default:"N/A" }}</td>
+                                <td class="px-4 py-2">{{ authority.business_unit.name|default:"N/A" }}</td>
+                                <td class="px-4 py-2">{{ authority.au_create_dt|date:"Y-m-d"|default:"N/A" }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="9" class="px-4 py-2 text-center text-gray-500">No authorities found.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <div class="p-4 text-center text-gray-500">No authorities available.</div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+{% endblock %}

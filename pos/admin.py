@@ -1,5 +1,7 @@
 from django.contrib import admin
 from .models import *
+from django import forms
+
 
 
 from django.contrib import admin
@@ -194,3 +196,85 @@ class SupplierPaymentAdmin(admin.ModelAdmin):
         'updateby', 'updatemarks'
     )
     autocomplete_fields = ['business_unit', 'branch', 'supplier']    
+
+
+
+
+@admin.register(Registration)
+class RegistrationAdmin(admin.ModelAdmin):
+    list_display = (
+        'business_unit', 'booking_id', 'customer', 'phone1', 'booking_agent_code',
+        'start_dt', 'end_dt', 'room', 'no_of_rooms', 'no_of_guest', 'unit_price',
+        'create_dt', 'create_by'
+    )
+    list_filter = ('business_unit', 'start_dt', 'create_dt')
+    search_fields = ('booking_id', 'booking_agent_code', 'booking_agent_ref_no', 'create_by')
+    ordering = ('-create_dt',)
+    readonly_fields = ('create_dt', 'create_tm', 'create_by', 'create_remarks', 'update_dt', 'update_tm', 'update_by', 'update_remarks')
+    fieldsets = (
+        (None, {
+            'fields': ('business_unit', 'booking_id', 'customer', 'phone1', 'booking_agent_code', 'booking_agent_dt', 'booking_agent_ref_no')
+        }),
+        ('Booking Details', {
+            'fields': ('start_dt', 'end_dt', 'start_tm', 'end_tm', 'room', 'no_of_rooms', 'no_of_guest', 'unit_price')
+        }),
+        ('Audit Information', {
+            'fields': ('create_dt', 'create_tm', 'create_by', 'create_remarks', 'update_dt', 'update_tm', 'update_by', 'update_remarks'),
+            'classes': ('collapse',)
+        }),
+    )
+    list_per_page = 10
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related('business_unit', 'customer', 'room')
+    
+
+
+@admin.register(Authority)
+class AuthorityAdmin(admin.ModelAdmin):
+    list_display = (
+        'business_unit', 'au_type', 'saas_username', 'au_menu', 'au_submenu',
+        'au_menu_text', 'au_submenu_text', 'au_status', 'au_create_dt', 'au_create_by'
+    )
+    list_filter = ('business_unit', 'au_type', 'au_status', 'au_create_dt')
+    search_fields = ('au_type', 'saas_username', 'au_menu', 'au_submenu', 'au_create_by')
+    ordering = ('-au_create_dt',)
+    readonly_fields = ('au_create_dt', 'au_create_tm', 'au_create_by', 'au_create_remarks', 'au_update_dt', 'au_update_tm', 'au_update_by', 'au_update_remarks')
+    fieldsets = (
+        (None, {
+            'fields': ('business_unit', 'au_type', 'saas_username', 'au_menu', 'au_submenu', 'au_menu_text', 'au_submenu_text', 'au_status')
+        }),
+        ('Audit Information', {
+            'fields': ('au_create_dt', 'au_create_tm', 'au_create_by', 'au_create_remarks', 'au_update_dt', 'au_update_tm', 'au_update_by', 'au_update_remarks'),
+            'classes': ('collapse',)
+        }),
+    )
+    list_per_page = 10
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related('business_unit')
+
+    def formfield_for_dbfield(self, db_field, request, **kwargs):
+        if db_field.name == 'saas_username':
+            business_unit_id = None
+            if request.GET.get('business_unit'):
+                business_unit_id = request.GET.get('business_unit')
+            elif request.POST.get('business_unit'):
+                business_unit_id = request.POST.get('business_unit')
+
+            if business_unit_id:
+                try:
+                    business_unit = BusinessUnit.objects.get(pk=business_unit_id)
+                    saas_users = SAASUsers.objects.filter(
+                        saas_customer=business_unit.business_unit_group.saas_customer
+                    ).values_list('saas_username', flat=True)
+                    
+                    kwargs['widget'] = forms.Select
+                    kwargs['choices'] = [(username, username) for username in saas_users]
+                    return forms.TypedChoiceField(**kwargs)
+                except BusinessUnit.DoesNotExist:
+                    pass
+
+        return super().formfield_for_dbfield(db_field, request, **kwargs)

@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>User Authority</h2>
+        <div class="text-muted text-end">
+            <div>Login By: {{ request.user.username }}</div>
+            <div>Server: Live</div>
+        </div>
+    </div>
+
+   {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+            <p style="color: {% if message.tags == 'error' %}red{% else %}green{% endif %};">
+                {{ message }}
+            </p>
+        {% endfor %}
+    </div>
+{% endif %}
+
+
+    <form method="POST" id="authorityForm">
+        {% csrf_token %}
+        <input type="hidden" name="user_id" value="{{ authority.saas_username }}">
+
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <strong>Current Authority - User ID: {{ authority.saas_username }}</strong>
+            <div>
+                <label class="form-check-label">
+                    <input type="checkbox" id="select-all" class="form-check-input" {% if all_checked %}checked{% endif %}>
+                    Select All
+                </label>
+            </div>
+        </div>
+
+        <div class="table-responsive mb-3">
+            <table class="table table-bordered table-striped">
+                <thead class="table-light">
+                    <tr>
+                        <th>Menu</th>
+                        <th>Sub Menu</th>
+                        <th class="text-center">Sel</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in menu_items %}
+                    <tr>
+                        <td>{{ item.au_menu }}</td>
+                        <td>{{ item.au_submenu_text }}</td>
+                        <td class="text-center">
+                            {% with permission=authority_permissions|get_item:item.id %}
+                                <input type="checkbox" name="menu_{{ item.au_menu|slugify }}_{{ item.au_submenu|slugify }}" 
+                                       class="form-check-input menu-checkbox" 
+                                       {% if permission and permission.au_status == '1' %}checked{% endif %}>
+                                <input type="hidden" name="menu_{{ item.au_menu|slugify }}_{{ item.au_submenu|slugify }}_status" 
+                                       value="{% if permission and permission.au_status == '1' %}1{% else %}0{% endif %}">
+                            {% endwith %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save me-1"></i> Save
+            </button>
+            <a href="{% url 'authority_list' %}" class="btn btn-secondary">
+                <i class="fas fa-times me-1"></i> Cancel
+            </a>
+        </div>
+    </form>
+
+    {% if new_access_items %}
+    <div class="mt-5">
+        <h5>New Access</h5>
+        <div class="table-responsive">
+            <table class="table table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>Menu</th>
+                        <th>Sub Menu</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in new_access_items %}
+                    <tr>
+                        <td>{{ item.au_menu }}</td>
+                        <td>{{ item.au_submenu_text }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+{% endblock %}
+

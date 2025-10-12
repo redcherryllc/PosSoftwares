@@ -2,6 +2,8 @@ from django.urls import path
 from . import views 
 from .views import login_view, home_view
 
+from django.views.decorators.csrf import csrf_exempt
+
 
 
 urlpatterns = [
@@ -32,10 +34,14 @@ urlpatterns = [
 
     path('api/get-sale-details/', views.get_sale_details, name='get_sale_details'),
 
+    
+
     path('logout/', views.logout_view, name='logout'),
 
     path('add-customer/', views.add_customer, name='add_customer'),
 
+
+    path('api/next-sale-no/', views.get_next_sale_no, name='get_next_sale_no'),
 
     
 
@@ -141,7 +147,9 @@ path('table/add/', views.table_add, name='table_add'),
     path('vehicle/list/', views.vehicle_list, name='vehicle_list'),
     path('vehicle/delete/<int:pk>/', views.vehicle_delete, name='vehicle_delete'),
     path('vehicle/inquiry/', views.vehicle_inquiry, name='vehicle_inquiry'),
-    path('vehicle/dashboard/', views.vehicle_dashboard, name='vehicle_dashboard'),    
+    path('vehicle/dashboard/', views.vehicle_dashboard, name='vehicle_dashboard'),
+
+
 
     path('saasuser/add/', views.saasuser_add, name='saasuser_add'),
     path('saasuser/edit/<int:pk>/', views.saasuser_edit, name='saasuser_edit'),
@@ -149,42 +157,37 @@ path('table/add/', views.table_add, name='table_add'),
     path('saasuser/delete/<int:pk>/', views.saasuser_delete, name='saasuser_delete'),
     path('saasuser/inquiry/', views.saasuser_inquiry, name='saasuser_inquiry'),
     path('saasuser/dashboard/', views.saasuser_dashboard, name='saasuser_dashboard'),
-
     path('category/add/', views.category_add, name='category_add'),
     path('category/edit/<int:pk>/', views.category_edit, name='category_edit'),
     path('category/list/', views.category_list, name='category_list'),
     path('category/delete/<int:pk>/', views.category_delete, name='category_delete'),
     path('category/inquiry/', views.category_inquiry, name='category_inquiry'),
     path('category/dashboard/', views.category_dashboard, name='category_dashboard'),
-
     path('businessunitgroup/add/', views.businessunitgroup_add, name='businessunitgroup_add'),
     path('businessunitgroup/edit/<int:pk>/', views.businessunitgroup_edit, name='businessunitgroup_edit'),
     path('businessunitgroup/list/', views.businessunitgroup_list, name='businessunitgroup_list'),
     path('businessunitgroup/delete/<int:pk>/', views.businessunitgroup_delete, name='businessunitgroup_delete'),
     path('businessunitgroup/inquiry/', views.businessunitgroup_inquiry, name='businessunitgroup_inquiry'),
     path('businessunitgroup/dashboard/', views.businessunitgroup_dashboard, name='businessunitgroup_dashboard'),
-  
+    
     path('businessunit/add/', views.businessunit_add, name='businessunit_add'),
     path('businessunit/edit/<int:pk>/', views.businessunit_edit, name='businessunit_edit'),
     path('businessunit/list/', views.businessunit_list, name='businessunit_list'),
     path('businessunit/delete/<int:pk>/', views.businessunit_delete, name='businessunit_delete'),
     path('businessunit/inquiry/', views.businessunit_inquiry, name='businessunit_inquiry'),
     path('businessunit/dashboard/', views.businessunit_dashboard, name='businessunit_dashboard'),
-   
     path('branch/add/', views.branch_add, name='branch_add'),
     path('branch/edit/<int:pk>/', views.branch_edit, name='branch_edit'),
     path('branch/list/', views.branch_list, name='branch_list'),
     path('branch/delete/<int:pk>/', views.branch_delete, name='branch_delete'),
     path('branch/inquiry/', views.branch_inquiry, name='branch_inquiry'),
     path('branch/dashboard/', views.branch_dashboard, name='branch_dashboard'),
-    
     path('warehouse/add/', views.warehouse_add, name='warehouse_add'),
     path('warehouse/edit/<int:pk>/', views.warehouse_edit, name='warehouse_edit'),
     path('warehouse/list/', views.warehouse_list, name='warehouse_list'),
     path('warehouse/delete/<int:pk>/', views.warehouse_delete, name='warehouse_delete'),
     path('warehouse/inquiry/', views.warehouse_inquiry, name='warehouse_inquiry'),
     path('warehouse/dashboard/', views.warehouse_dashboard, name='warehouse_dashboard'),
-    
     path('customer/add/', views.customer_add, name='customer_add'),
     path('customer/edit/<int:pk>/', views.customer_edit, name='customer_edit'),
     path('customer/list/', views.customer_list, name='customer_list'),
@@ -192,9 +195,37 @@ path('table/add/', views.table_add, name='table_add'),
     path('customer/inquiry/', views.customer_inquiry, name='customer_inquiry'),
     path('customer/dashboard/', views.customer_dashboard, name='customer_dashboard'),
 
- 
 
- 
+    path('registration/add/', views.registration_add, name='registration_add'),
+    path('registration/edit/<int:pk>/', views.registration_edit, name='registration_edit'),
+    path('registration/list/', views.registration_list, name='registration_list'),
+    path('registration/delete/<int:pk>/', views.registration_delete, name='registration_delete'),
+    path('registration/inquiry/', views.registration_inquiry, name='registration_inquiry'),
 
+    path('authority/delete/<int:pk>/', views.authority_delete, name='authority_delete'),
+    path('authority/inquiry/', views.authority_inquiry, name='authority_inquiry'),
+
+ path('api/authority/<str:user_id>/', views.get_authority_data, name='get_authority_data'),
+    path('api/authority/save/', csrf_exempt(views.save_authority_data), name='save_authority_data'),
+
+
+    path('authority/add/', views.authority_assign, name='authority_assign'),
+   
+    path('authority/edit/<int:pk>/', views.authority_assign, name='authority_edit'),
+   
+    path('authority/list/', views.authority_list, name='authority_list'),
+
+    path('authority/add/', views.authority_assign, name='authority_assign'),
+    path('authority/add/<int:pk>/', views.authority_assign, name='authority_assign_with_pk'),
+
+
+    path('authority/assign/', views.authority_assign, name='authority_assign'),
+    path('authority/assign/<int:pk>/', views.authority_assign, name='authority_assign_with_pk'),
+    path('authority/get_authority_data/<int:user_id>/', views.get_authority_data, name='get_authority_data'),
+
+
+    path('api/customers/', views.get_customers, name='get_customers'),
+
+     path('update-booking-status/', views.update_booking_status, name='update_booking_status'),
 
 ]

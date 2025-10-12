@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1 class="page-title">User Authority</h1>
+        <div class="header-info">
+            <div>Login By: {{ request.user.username }}</div>
+            <div>Application Connected To: Live Server</div>
+        </div>
+    </div>
+
+    {% if messages %}
+        <div class="messages">
+            {% for message in messages %}
+                <p class="{{ message.tags }}">
+                    {% if message.tags == 'error' %}
+                        <i class="fas fa-exclamation-circle"></i>
+                    {% elif message.tags == 'success' %}
+                        <i class="fas fa-check-circle"></i>
+                    {% endif %}
+                    {{ message }}
+                </p>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="user-selection">
+        <label for="user-select">Select User:</label>
+        <select id="user-select" name="user_id">
+            <option value="">-- Select User --</option>
+            {% for user in users %}
+                <option value="{{ user.saas_user_id }}">{{ user.saas_username }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <form method="POST" id="authorityForm">
+        {% csrf_token %}
+        <input type="hidden" name="user_id" id="form-user-id" value="">
+        
+        <div class="authority-header">
+            Current Authority - User ID: <span id="current-user-id">Not selected</span>
+            <label style="float: right;">
+                <input type="checkbox" id="select-all"> Select All
+            </label>
+        </div>
+        
+        <div class="loading" id="loading">
+            <i class="fas fa-spinner fa-spin"></i> Loading authority data...
+        </div>
+        
+        <div class="authority-table-container">
+            <table class="authority-table" id="authority-table">
+                <thead>
+                    <tr>
+                        <th>Menu</th>
+                        <th>Sub Menu</th>
+                        <th class="checkbox-cell">Sel</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for menu_item in menu_items %}
+                    <tr>
+                        <td>{{ menu_item.au_menu }}</td>
+                        <td>{{ menu_item.au_submenu_text }}</td>
+                        <td class="checkbox-cell">
+                            <input type="checkbox" name="menu_{{ menu_item.au_menu|slugify }}_{{ menu_item.au_submenu|slugify }}" 
+                                   class="menu-checkbox" data-menu="{{ menu_item.au_menu }}" 
+                                   data-submenu="{{ menu_item.au_submenu }}">
+                            <input type="hidden" name="menu_{{ menu_item.au_menu|slugify }}_{{ menu_item.au_submenu|slugify }}_status" value="0">
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="btn-container">
+            <button type="submit" class="btn-primary">
+                <i class="fas fa-save"></i> Save
+            </button>
+            <a href="{% url 'authority_list' %}" class="cancel-link">
+                <i class="fas fa-times"></i> Cancel
+            </a>
+        </div>
+    </form>
+
+    <div class="new-access-section" id="new-access-section" style="display: none;">
+        <div class="new-access-header">New Access</div>
+        <table class="new-access-table" id="new-access-table">
+            <thead>
+                <tr>
+                    <th>Menu</th>
+                    <th>Sub Menu</th>
+                </tr>
+            </thead>
+            <tbody>
+                
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<link rel="stylesheet" href="{% static 'images/css/authority_style.css' %}">
+<script src="{% static 'images/js/authority_script.js' %}"></script>
+{% endblock %}
