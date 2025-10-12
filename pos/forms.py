@@ -3,6 +3,11 @@ from .models import *
 
 from django.forms import modelformset_factory
 
+from django.contrib.auth.hashers import make_password
+import re
+
+
+
 
 class LoginForm(forms.Form):
     saas_username = forms.CharField(max_length=50, required=True)
@@ -250,7 +255,7 @@ class SupplierForm(forms.ModelForm):
 
     def save(self, commit=True):
         supplier = super().save(commit=False)
-        supplier.supplier_type = 'cash'  
+        supplier.supplier_type = 'cash'  # Set default supplier_type to 'cash'
         if commit:
             supplier.save()
         return supplier
@@ -349,23 +354,6 @@ class VehicleForm(forms.ModelForm):
 
 
 
-class CustomerForm(forms.ModelForm):
-    class Meta:
-        model = Customer
-        fields = ['customer_name', 'phone_1', 'phone_2', 'email', 'address']
-        widgets = {
-            'customer_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'phone_1': forms.NumberInput(attrs={'class': 'form-control'}),
-            'phone_2': forms.NumberInput(attrs={'class': 'form-control'}),
-            'email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
-        }
-
-    def __init__(self, *args, **kwargs):
-        self.business_unit = kwargs.pop('business_unit', None)
-        super().__init__(*args, **kwargs)
-
-
 
 class CategoryForm(forms.ModelForm):
     class Meta:
@@ -437,7 +425,7 @@ class BusinessUnitGroupForm(forms.ModelForm):
 class BusinessUnitForm(forms.ModelForm):
     class Meta:
         model = BusinessUnit
-        fields = ['business_unit_name', 'business_unit_currency', 'phone_1', 'phone_2', 'email', 'address', 'business_unit_group']
+        fields = ['business_unit_name', 'business_unit_currency', 'phone_1', 'phone_2', 'email', 'business_unit_group', 'address']
         widgets = {
             'business_unit_name': forms.TextInput(attrs={'class': 'form-control'}),
             'business_unit_currency': forms.TextInput(attrs={'class': 'form-control'}),
@@ -505,3 +493,283 @@ class WarehouseForm(forms.ModelForm):
         if commit:
             warehouse.save()
         return warehouse
+
+
+
+
+
+
+
+
+
+
+class CustomerForm(forms.ModelForm):
+    class Meta:
+        model = Customer
+        fields = ['customer_name', 'phone_1', 'phone_2', 'email', 'aadhaar_card_no', 'national_id', 'passport_no', 'address']
+        widgets = {
+            'customer_name': forms.TextInput(attrs={
+                'class': 'form-control', 
+                'placeholder': 'Enter customer name',
+                'required': 'required'
+            }),
+            'phone_1': forms.TextInput(attrs={
+                'class': 'form-control', 
+                'placeholder': 'Enter primary phone number',
+                'pattern': '[0-9]{10,15}',
+                'required': 'required'
+            }),
+            'phone_2': forms.TextInput(attrs={
+                'class': 'form-control', 
+                'placeholder': 'Enter secondary phone number ',
+                'pattern': '[0-9]{10,15}'
+            }),
+            'email': forms.EmailInput(attrs={
+                'class': 'form-control', 
+                'placeholder': 'Enter email address '
+            }),
+            'address': forms.Textarea(attrs={
+                'class': 'form-control', 
+                'rows': 3,
+                'placeholder': 'Enter address '
+            }),
+            'aadhaar_card_no': forms.TextInput(attrs={
+                'class': 'form-control', 
+                'placeholder': 'Enter 12-digit Aadhaar number ',
+                'pattern': '[0-9]{12}',
+                'maxlength': '12'
+            }),
+            'national_id': forms.TextInput(attrs={
+                'class': 'form-control', 
+                'placeholder': 'Enter national ID '
+            }),
+            'passport_no': forms.TextInput(attrs={
+                'class': 'form-control', 
+                'placeholder': 'Enter passport number '
+            }),
+        }
+        labels = {
+            'customer_name': 'Customer Name *',
+            'phone_1': 'Phone Number (Primary) *',
+            'phone_2': 'Phone Number (Secondary)',
+            'email': 'Email',
+            'aadhaar_card_no': 'Aadhaar Number',
+            'national_id': 'National ID',
+            'passport_no': 'Passport Number',
+            'address': 'Address',
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.business_unit = kwargs.pop('business_unit', None)
+        super().__init__(*args, **kwargs)
+        
+       
+        self.fields['phone_2'].required = False
+        self.fields['email'].required = False
+        self.fields['address'].required = False
+        self.fields['aadhaar_card_no'].required = False
+        self.fields['national_id'].required = False
+        self.fields['passport_no'].required = False
+
+    def clean_customer_name(self):
+        customer_name = self.cleaned_data.get('customer_name', '').strip()
+        if not customer_name:
+            raise forms.ValidationError("Customer name is required.")
+        return customer_name
+
+    def clean_phone_1(self):
+        phone_1 = self.cleaned_data.get('phone_1', '').strip()
+        if not phone_1:
+            raise forms.ValidationError("Primary phone number is required.")
+        
+        
+        phone_digits = re.sub(r'\D', '', phone_1)
+        if not (10 <= len(phone_digits) <= 15):
+            raise forms.ValidationError("Phone number must be between 10 and 15 digits.")
+        
+        
+        if self.business_unit:
+            existing = Customer.objects.filter(
+                business_unit=self.business_unit, 
+                phone_1=phone_1
+            )
+            if self.instance and self.instance.pk:
+                existing = existing.exclude(pk=self.instance.pk)
+            
+            if existing.exists():
+                raise forms.ValidationError("This phone number already exists for this business unit.")
+        
+        return phone_1
+
+    def clean_phone_2(self):
+        phone_2 = self.cleaned_data.get('phone_2', '').strip()
+        if phone_2:  
+            phone_digits = re.sub(r'\D', '', phone_2)
+            if not (10 <= len(phone_digits) <= 15):
+                raise forms.ValidationError("Phone number must be between 10 and 15 digits.")
+        return phone_2
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email', '').strip()
+        
+        return email
+
+    def clean_aadhaar_card_no(self):
+        aadhaar = self.cleaned_data.get('aadhaar_card_no', '').strip()
+        if aadhaar:  
+            if not re.match(r'^\d{12}$', aadhaar):
+                raise forms.ValidationError("Aadhaar number must be exactly 12 digits.")
+        return aadhaar
+
+    def clean_national_id(self):
+        national_id = self.cleaned_data.get('national_id', '').strip()
+        return national_id
+
+    def clean_passport_no(self):
+        passport_no = self.cleaned_data.get('passport_no', '').strip()
+        return passport_no
+
+    def clean_address(self):
+        address = self.cleaned_data.get('address', '').strip()
+        return address
+    
+
+    
+
+
+
+class RegistrationForm(forms.ModelForm):
+    class Meta:
+        model = Registration
+        fields = [
+            'customer', 'phone1', 'booking_agent_code', 'booking_agent_dt',
+            'booking_agent_ref_no', 'start_dt', 'end_dt', 'start_tm', 'end_tm',
+            'room', 'no_of_rooms', 'no_of_guest', 'unit_price', 'booking_dt',
+            'booking_status'
+        ]
+        widgets = {
+            'customer': forms.Select(attrs={'class': 'form-control'}),
+            'phone1': forms.TextInput(attrs={'class': 'form-control'}),
+            'booking_agent_code': forms.TextInput(attrs={'class': 'form-control'}),
+            'booking_agent_dt': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'booking_agent_ref_no': forms.TextInput(attrs={'class': 'form-control'}),
+            'start_dt': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'end_dt': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'start_tm': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            'end_tm': forms.DateTimeInput(attrs={'class': 'form-control', 'type': 'datetime-local'}),
+            'room': forms.Select(attrs={'class': 'form-control'}),
+            'no_of_rooms': forms.NumberInput(attrs={'class': 'form-control'}),
+            'no_of_guest': forms.NumberInput(attrs={'class': 'form-control'}),
+            'unit_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.001'}),
+            'booking_dt': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'booking_status': forms.Select(
+                attrs={'class': 'form-control'},
+                choices=[
+                    ('00', 'Booked'),
+                    ('10', 'Confirmed'),
+                    ('20', 'Occupied'),
+                    ('40', 'Cancelled'),
+                    ('50', 'Released'),
+                ]
+            ),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.business_unit = kwargs.pop('business_unit', None)
+        super().__init__(*args, **kwargs)
+        if self.business_unit:
+            self.fields['customer'].queryset = Customer.objects.filter(business_unit=self.business_unit)
+            self.fields['room'].queryset = Rooms.objects.filter(business_unit=self.business_unit)
+
+    def save(self, commit=True):
+        registration = super().save(commit=False)
+        if self.business_unit:
+            registration.business_unit = self.business_unit
+        if commit:
+            registration.save()
+        return registration
+    
+    
+
+
+class AuthorityForm(forms.ModelForm):
+    class Meta:
+        model = Authority
+        fields = ['au_type', 'saas_username', 'au_menu', 'au_submenu', 'au_menu_text', 'au_submenu_text', 'au_status']
+        widgets = {
+            'au_type': forms.TextInput(attrs={'class': 'form-control'}),
+            'saas_username': forms.TextInput(attrs={'class': 'form-control'}),
+            'au_menu': forms.TextInput(attrs={'class': 'form-control'}),
+            'au_submenu': forms.TextInput(attrs={'class': 'form-control'}),
+            'au_menu_text': forms.TextInput(attrs={'class': 'form-control'}),
+            'au_submenu_text': forms.TextInput(attrs={'class': 'form-control'}),
+            'au_status': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.business_unit = kwargs.pop('business_unit', None)
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.au_status:
+            self.fields['au_status'].initial = True
+        else:
+            self.fields['au_status'].initial = False
+
+    def save(self, commit=True):
+        authority = super().save(commit=False)
+        if self.business_unit:
+            authority.business_unit = self.business_unit
+        authority.au_status = self.cleaned_data.get('au_status', False)
+        if commit:
+            authority.save()
+        return authority
+
+class SAASUserForm(forms.Form):
+    
+    saas_username = forms.ModelChoiceField(
+        queryset=SAASUsers.objects.none(),
+        empty_label="Select User",
+        label="Select Existing User",
+        to_field_name='saas_user_id',  
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    
+    
+    add_new_user = forms.ModelChoiceField(
+        queryset=SAASUsers.objects.none(),
+        empty_label="Select User to Add",
+        label="Add Other Existing User",
+        to_field_name='saas_username',  
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+
+    def __init__(self, business_unit_id=None, logged_in_username=None, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if business_unit_id and logged_in_username:
+            try:
+                
+                business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
+                saas_customer = business_unit.business_unit_group.saas_customer
+
+                
+                authority_usernames = Authority.objects.filter(
+                    business_unit_id=business_unit_id
+                ).values_list('saas_username', flat=True).distinct()
+                
+                
+                self.fields['saas_username'].queryset = SAASUsers.objects.filter(
+                    saas_username__in=authority_usernames
+                ).order_by('saas_username')
+                
+                
+                self.fields['add_new_user'].queryset = SAASUsers.objects.filter(
+                    saas_customer=saas_customer
+                ).exclude(
+                    saas_username__in=authority_usernames
+                ).exclude(
+                    saas_username=logged_in_username
+                ).order_by('saas_username')
+                
+            except (BusinessUnit.DoesNotExist, AttributeError) as e:
+                
+                self.fields['saas_username'].queryset = SAASUsers.objects.none()
+                self.fields['add_new_user'].queryset = SAASUsers.objects.none()

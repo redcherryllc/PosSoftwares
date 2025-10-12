@@ -2,51 +2,238 @@
 {% load static %}
 
 {% block title %}Room Dashboard{% endblock %}
+{% block page_title %}Room Dashboard{% endblock %}
+
+{% block extra_styles %}
+<link rel="stylesheet" href="{% static 'images/css/admin.css' %}">
+<link rel="stylesheet" href="{% static 'images/css/admin_room_bookings.css' %}">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="{% static 'images/css/admin_dashboard.css' %}">
+<style>
+    .room-title {
+        background-color: #f0f4f8;
+        padding: 10px 15px;
+        border-left: 4px solid #007bff;
+        margin-bottom: 15px;
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #333;
+        border-radius: 4px;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Room Dashboard</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-</head>
-<body class="bg-gray-100 min-h-screen">
-    <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <header class="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-            <h1 class="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800">Room Dashboard</h1>
-            <a href="{% url 'room_inquiry' %}" class="bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-md hover:bg-blue-700 flex items-center text-sm sm:text-base">
-                <i class="fas fa-list mr-2 text-sm sm:text-base"></i> View All Rooms
-            </a>
-        </header>
+<div class="dashboard-grid">
+    <div class="left-column">
+        
+        {% if rooms or available_rooms_list or booked_not_confirmed_list or confirmed_rooms_list or occupied_rooms_list or cancelled_rooms_list or released_rooms_list %}
+        <div class="menu-group">
+            <div class="menu-title"><i class="fas fa-building"></i> Room Bookings</div>
+            <div class="panel">
+                <div class="panel-header">
+                    <div class="panel-title"><i class="fas fa-door-open"></i> Rooms Overview</div>
+                    <button class="action-button btn-secondary">
+                        <a href="{% url 'room_inquiry' %}"><i class="fas fa-eye"></i> View All Rooms</a>
+                    </button>
+                </div>
+                <div class="panel-content">
+                    <div class="room-details">
+                        
+                        <form id="room-selection-form" method="POST" action="{% url 'room_dashboard' %}">
+                            {% csrf_token %}
+                            <div class="room-selection">
+                                <select name="room_id" id="room-select-admin" class="form-control">
+                                    <option value="" {% if not selected_room_id %}selected{% endif %}>Select a Room</option>
+                                    {% for room in rooms %}
+                                        <option value="{{ room.room_id }}"
+                                                {% if selected_room_id == room.room_id %}selected{% endif %}>
+                                            {{ room.room_name }}
+                                        </option>
+                                    {% empty %}
+                                        <option disabled>No Rooms Available</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="submit" class="btn btn-primary" title="Select Room and Go to POS">
+                                    <i class="fas fa-arrow-right"></i>
+                                </button>
+                            </div>
+                        </form>
 
-        {% if messages %}
-            <div class="mb-6">
-                {% for message in messages %}
-                    <div class="p-3 sm:p-4 rounded-md text-sm sm:text-base
-                        {% if message.tags == 'error' %}bg-red-100 text-red-700{% endif %}
-                        {% if message.tags == 'success' %}bg-green-100 text-green-700{% endif %}
-                        {% if message.tags == 'warning' %}bg-orange-100 text-orange-700{% endif %}">
-                        {{ message }}
+                        
+                        <div class="room-sections">
+                            
+                            <div class="room-section" id="available-rooms-list">
+                                <h2 class="room-title">Available Rooms ({{ counts.available|default:"0" }})</h2>
+                                {% if available_rooms_list %}
+                                    <div class="room-box-container">
+                                        {% for room in available_rooms_list %}
+                                            <div class="room-box available-rooms">
+                                                <p><strong>{{ room.room_name }}</strong></p>
+                                                <div class="room-actions">
+                                                    <button class="btn btn-sm btn-primary select-room-btn"
+                                                            data-room-id="{{ room.room_id }}"
+                                                            title="Select this room and go to POS">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="no-data-message">No rooms are currently available.</div>
+                                {% endif %}
+                            </div>
+
+                           
+                            <div class="room-section" id="booked-rooms-list">
+                                <h2 class="room-title">Booked (Not Confirmed) ({{ counts.booked|default:"0" }})</h2>
+                                {% if booked_not_confirmed_list %}
+                                    <div class="room-box-container">
+                                        {% for booking in booked_not_confirmed_list %}
+                                            <div class="room-box booked-not-confirmed">
+                                                <p><strong>{{ booking.room_name }}</strong></p>
+                                                <div class="room-actions">
+                                                    <button class="btn btn-sm btn-primary select-room-btn"
+                                                            data-room-id="{{ booking.room_id }}"
+                                                            title="Select this room and go to POS">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                    <a href="{% url 'registration_edit' pk=booking.booking_id %}" class="btn btn-sm btn-warning" title="Edit Registration">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="no-data-message">No rooms are currently booked.</div>
+                                {% endif %}
+                            </div>
+
+                            
+                            <div class="room-section" id="confirmed-rooms-list">
+                                <h2 class="room-title">Confirmed Rooms ({{ counts.confirmed|default:"0" }})</h2>
+                                {% if confirmed_rooms_list %}
+                                    <div class="room-box-container">
+                                        {% for booking in confirmed_rooms_list %}
+                                            <div class="room-box confirmed-rooms">
+                                                <p><strong>{{ booking.room_name }}</strong></p>
+                                                <div class="room-actions">
+                                                    <button class="btn btn-sm btn-primary select-room-btn"
+                                                            data-room-id="{{ booking.room_id }}"
+                                                            title="Select this room and go to POS">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                    <a href="{% url 'registration_edit' pk=booking.booking_id %}" class="btn btn-sm btn-warning" title="Edit Registration">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="no-data-message">No rooms are currently confirmed.</div>
+                                {% endif %}
+                            </div>
+
+                            
+                            <div class="room-section" id="occupied-rooms-list">
+                                <h2 class="room-title">Occupied Rooms ({{ counts.occupied|default:"0" }})</h2>
+                                {% if occupied_rooms_list %}
+                                    <div class="room-box-container">
+                                        {% for booking in occupied_rooms_list %}
+                                            <div class="room-box occupied-rooms">
+                                                <p><strong>{{ booking.room_name }}</strong></p>
+                                                <div class="room-actions">
+                                                    <button class="btn btn-sm btn-primary select-room-btn"
+                                                            data-room-id="{{ booking.room_id }}"
+                                                            title="Select this room and go to POS">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                    <a href="{% url 'registration_edit' pk=booking.booking_id %}" class="btn btn-sm btn-warning" title="Edit Registration">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="no-data-message">No rooms are currently occupied.</div>
+                                {% endif %}
+                            </div>
+
+                           
+                            <div class="room-section" id="cancelled-rooms-list">
+                                <h2 class="room-title">Cancelled Rooms ({{ counts.cancelled|default:"0" }})</h2>
+                                {% if cancelled_rooms_list %}
+                                    <div class="room-box-container">
+                                        {% for booking in cancelled_rooms_list %}
+                                            <div class="room-box cancelled-rooms">
+                                                <p><strong>{{ booking.room_name }}</strong></p>
+                                                <div class="room-actions">
+                                                    <button class="btn btn-sm btn-primary select-room-btn"
+                                                            data-room-id="{{ booking.room_id }}"
+                                                            title="Select this room and go to POS">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                    <a href="{% url 'registration_edit' pk=booking.booking_id %}" class="btn btn-sm btn-warning" title="Edit Registration">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="no-data-message">No rooms are currently cancelled.</div>
+                                {% endif %}
+                            </div>
+
+                            
+                            <div class="room-section" id="released-rooms-list">
+                                <h2 class="room-title">Released Rooms ({{ counts.released|default:"0" }})</h2>
+                                {% if released_rooms_list %}
+                                    <div class="room-box-container">
+                                        {% for booking in released_rooms_list %}
+                                            <div class="room-box released-rooms">
+                                                <p><strong>{{ booking.room_name }}</strong></p>
+                                                <div class="room-actions">
+                                                    <button class="btn btn-sm btn-primary select-room-btn"
+                                                            data-room-id="{{ booking.room_id }}"
+                                                            title="Select this room and go to POS">
+                                                        <i class="fas fa-check"></i>
+                                                    </button>
+                                                    <a href="{% url 'registration_edit' pk=booking.booking_id %}" class="btn btn-sm btn-warning" title="Edit Registration">
+                                                        <i class="fas fa-edit"></i>
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                {% else %}
+                                    <div class="no-data-message">No rooms are currently released.</div>
+                                {% endif %}
+                            </div>
+                        </div>
                     </div>
-                {% endfor %}
+                </div>
             </div>
+        </div>
+        {% else %}
+            <div class="no-data-message">No rooms data available.</div>
         {% endif %}
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            <div class="bg-white p-4 sm:p-6 rounded-lg shadow-md flex items-center">
-                <div class="mr-3 sm:mr-4 text-green-600">
-                    <i class="fas fa-door-open fa-lg sm:fa-2x"></i>
-                </div>
-                <div>
-                    <h4 class="text-base sm:text-lg font-semibold text-gray-700">Total Rooms</h4>
-                    <p class="text-xl sm:text-2xl font-bold text-green-700">{{ room_count }}</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="mt-6 text-xs sm:text-sm text-gray-600 flex items-center">
-            <i class="fas fa-lock mr-2 text-xs sm:text-sm"></i> Secure Data Access
-        </div>
     </div>
-</body>
+</div>
+
+<script>
+   
+    document.querySelectorAll('.select-room-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const roomId = this.getAttribute('data-room-id');
+            const roomSelect = document.getElementById('room-select-admin');
+            roomSelect.value = roomId;
+            document.getElementById('room-selection-form').submit();
+        });
+    });
+</script>
 {% endblock %}

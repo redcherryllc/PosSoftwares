@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 import datetime
+import pytz
 
 
 
@@ -173,20 +174,32 @@ class Warehouse(models.Model):
     def __str__(self):
          return self.warehouse_name
     
+
+
+
+
+
+
+
+DEFAULT_DATETIME = timezone.make_aware(datetime.datetime(1900, 1, 1, 0, 0, 0), timezone=pytz.UTC)
+
 class Customer(models.Model):
     customer_id = models.BigAutoField(primary_key=True)
-    business_unit = models.ForeignKey(BusinessUnit, on_delete=models.CASCADE, db_column='business_unit_id')
-    customer_name = models.CharField(max_length=150, null=False)
-    phone_1 = models.BigIntegerField(default=0, null=False)
-    phone_2 = models.BigIntegerField(default=0, null=False)
-    email = models.CharField(max_length=50, default='', null=False)
-    address = models.CharField(max_length=200, default='', null=False)
+    business_unit = models.ForeignKey('BusinessUnit', on_delete=models.CASCADE, db_column='business_unit_id')
+    customer_name = models.CharField(max_length=150, null=False, blank=False)
+    phone_1 = models.CharField(max_length=20, default='', null=False, blank=False)
+    phone_2 = models.CharField(max_length=20, default='', null=False, blank=True)  
+    email = models.CharField(max_length=50, default='', null=False, blank=True)  
+    address = models.CharField(max_length=200, default='', null=False, blank=True)  
+    aadhaar_card_no = models.CharField(max_length=100, default='', null=False, blank=True)  
+    national_id = models.CharField(max_length=100, default='', null=False, blank=True)  
+    passport_no = models.CharField(max_length=100, default='', null=False, blank=True)  
     create_dt = models.DateField(auto_now_add=True, null=False)
     create_tm = models.DateTimeField(auto_now_add=True, null=False)
     create_by = models.CharField(max_length=10, default='', null=False)
     create_remarks = models.CharField(max_length=200, default='', null=False)
-    update_dt = models.DateField(default='1900-01-01', null=False)
-    update_tm = models.DateField(default='1900-01-01', null=False)
+    update_dt = models.DateField(default=timezone.now, null=False)
+    update_tm = models.DateTimeField(default=DEFAULT_DATETIME, null=False)
     update_by = models.CharField(max_length=10, default='', blank=True)
     update_marks = models.CharField(max_length=200, default='', blank=True)
 
@@ -194,8 +207,10 @@ class Customer(models.Model):
         db_table = 'CUSTOMER'
 
     def __str__(self):
-         return self.customer_name
+        return self.customer_name
     
+
+
 class Suppliers(models.Model):
     supplier_id = models.BigAutoField(primary_key=True)
     business_unit = models.ForeignKey(BusinessUnit, on_delete=models.CASCADE, db_column='business_unit_id')
@@ -549,8 +564,6 @@ class PurchaseOrderItems(models.Model):
 
 
 
-
-
 class SalesHeader(models.Model):
     sale_id = models.BigAutoField(primary_key=True)
     business_unit = models.ForeignKey('BusinessUnit', on_delete=models.CASCADE, db_column='business_unit_id')
@@ -559,6 +572,7 @@ class SalesHeader(models.Model):
     table = models.ForeignKey('Tables', on_delete=models.SET_NULL, null=True, blank=True, db_column='table_id')
     room = models.ForeignKey('Rooms', on_delete=models.SET_NULL, null=True, blank=True, db_column='room_id')
     vehicle = models.ForeignKey('Vehicle', on_delete=models.SET_NULL, null=True, blank=True, db_column='vehicle_id')
+    registration = models.ForeignKey('Registration', on_delete=models.SET_NULL, null=True, blank=True)  # New field
     sale_date = models.DateField(auto_now_add=True, null=False)
     sale_no = models.CharField(max_length=50, default='', null=False)
     total_amount = models.DecimalField(max_digits=22, decimal_places=3, default=0, null=False)
@@ -580,6 +594,8 @@ class SalesHeader(models.Model):
 
     class Meta:
         db_table = 'SALESHEADER'
+
+   
 
     def save(self, *args, **kwargs):
         if not self.pk or not self.sale_no or self.sale_no == '':
@@ -606,7 +622,7 @@ class SalesHeader(models.Model):
         if self.sale_no and self.sale_no.startswith(date_str):
             seq_num = self.sale_no[8:]  
         else:
-           
+            
             earlier_sales = SalesHeader.objects.filter(
                 business_unit=self.business_unit,
                 branch=self.branch,
@@ -623,7 +639,7 @@ class SalesHeader(models.Model):
         return self.daily_sale_no
 
     def __str__(self):
-        return self.daily_sale_no  
+        return self.daily_sale_no
     
 class SalesLine(models.Model):
     sale_line_id = models.BigAutoField(primary_key=True)
@@ -668,7 +684,7 @@ class StockAdjustment(models.Model):
     createtm = models.DateTimeField(default=timezone.now)
     createby = models.CharField(max_length=10, default='')
     createremarks = models.CharField(max_length=200, default='')
-    updatedt = models.DateField(default='1900-01-01', null=False)
+    updatedt = models.DateField(default='1900-01-01')
     updatetm = models.DateTimeField(default=datetime.datetime(1900, 1, 1))
     updateby = models.CharField(max_length=10, default='')
     updatemarks = models.CharField(max_length=200, default='')
@@ -705,3 +721,61 @@ class SupplierPayment(models.Model):
 
     def __str__(self):
         return f"Payment {self.payment_ref} - {self.supplier}"
+    
+class Registration(models.Model):
+    business_unit = models.ForeignKey('BusinessUnit', on_delete=models.CASCADE)
+    booking_id = models.BigAutoField(primary_key=True)
+    customer = models.ForeignKey('Customer', on_delete=models.CASCADE)
+    phone1 = models.DecimalField(max_digits=22, decimal_places=0, default=0)
+    booking_agent_code = models.CharField(max_length=150, default='')
+    booking_agent_dt = models.DateField(default='1900-01-01')
+    booking_agent_ref_no = models.CharField(max_length=100, default='')
+    start_dt = models.DateField(default='1900-01-01')
+    end_dt = models.DateField(default='1900-01-01')
+    start_tm = models.DateTimeField(default='1900-01-01 00:00:00')
+    end_tm = models.DateTimeField(default='1900-01-01 00:00:00')
+    room = models.ForeignKey('Rooms', on_delete=models.CASCADE)
+    no_of_rooms = models.DecimalField(max_digits=22, decimal_places=0, default=0)
+    no_of_guest = models.DecimalField(max_digits=22, decimal_places=0, default=0)
+    unit_price = models.DecimalField(max_digits=22, decimal_places=3, default=0)
+    create_dt = models.DateField(default='1900-01-01')
+    create_tm = models.DateTimeField(auto_now_add=True)
+    create_by = models.CharField(max_length=10, default='')
+    create_remarks = models.CharField(max_length=200, default='')
+    update_dt = models.DateField(default='1900-01-01')
+    update_tm = models.DateTimeField(default='1900-01-01 00:00:00')
+    update_by = models.CharField(max_length=10, default='')
+    update_remarks = models.CharField(max_length=200, default='')
+    booking_dt = models.DateField(default='1900-01-01')  
+    booking_status = models.CharField(max_length=10, default='00')  
+
+    class Meta:
+        db_table = 'REGISTRATION'
+        unique_together = (('business_unit', 'booking_id'),)
+
+    def __str__(self):
+        return f"Booking {self.booking_id} - {self.room.room_name} ({self.booking_status})"
+    
+
+
+class Authority(models.Model):
+    business_unit = models.ForeignKey('BusinessUnit', on_delete=models.CASCADE)
+    au_type = models.CharField(max_length=50, default='', db_column='AUTYPE')
+    saas_username = models.CharField(max_length=50, default='', null=False)
+    au_menu = models.CharField(max_length=200, default='', db_column='AUMENU')
+    au_submenu = models.CharField(max_length=200, default='', db_column='AUSUBMENU')
+    au_menu_text = models.CharField(max_length=200, default='', db_column='AUMENUTEXT')
+    au_submenu_text = models.CharField(max_length=200, default='', db_column='AUSUBMENUTEXT')
+    au_status = models.CharField(max_length=10, default='', db_column='AUSTATUS')
+    au_create_dt = models.DateTimeField(default='1900-01-01', db_column='AUCREATEDT')
+    au_create_tm = models.DateTimeField(default='1900-01-01', db_column='AUCREATETM')
+    au_create_by = models.CharField(max_length=10, default='', db_column='AUCREATEBY')
+    au_create_remarks = models.CharField(max_length=250, default='', db_column='AUCREATEREMARKS')
+    au_update_dt = models.DateTimeField(default='1900-01-01', db_column='AUUPDATEDT')
+    au_update_tm = models.DateTimeField(default='1900-01-01', db_column='AUUPDATETM')
+    au_update_by = models.CharField(max_length=10, default='', db_column='AUUPDATEBY')
+    au_update_remarks = models.CharField(max_length=250, default='', db_column='AUUPDATEREMARKS')
+
+    class Meta:
+        db_table = 'AUTHORITY'
+        unique_together = (('business_unit', 'au_type', 'saas_username', 'au_menu', 'au_submenu'),)

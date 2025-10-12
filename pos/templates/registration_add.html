@@ -1,0 +1,154 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-6 max-w-3xl">
+    {% if messages %}
+        <div class="mb-4">
+            {% for message in messages %}
+                <div class="{% if message.tags == 'success' %}success-message{% else %}error-message{% endif %}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>
+
+
+<div class="modal fade" id="customerModal" tabindex="-1" aria-labelledby="customerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg max-w-3xl mx-auto">
+        <div class="modal-content">
+            <div class="modal-header bg-gray-50 border-b">
+                <h5 class="modal-title text-lg font-semibold text-gray-800" id="customerModalLabel">Customer and Registration</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <!-- Customer Search -->
+                <div id="customer-search-section">
+                    <div class="flex flex-col sm:flex-row gap-3 mb-4 items-center">
+                        <input type="text" id="customer-search-input" 
+                               class="form-control rounded-md border-gray-300 focus:ring-2 focus:ring-blue-400 py-2 flex-grow" 
+                               placeholder="Search by name, phone, or Aadhaar">
+                        <button id="customer-search-btn" 
+                                class="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 transition duration-150 text-sm">
+                            Search
+                        </button>
+                    </div>
+                    <div id="customer-search-results" class="mb-4"></div>
+                </div>
+                <!-- Customer Form -->
+                <div id="customer-form-section" style="display: none;" class="form-section">
+                    <h6 class="text-lg font-medium text-gray-700 mb-4 text-center"></h6>
+                    <form id="customer-form" method="POST" class="space-y-4">
+                        {% csrf_token %}
+                        <input type="hidden" name="customer_submit" value="1">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="flex flex-col">
+                                <label for="id_customer_name" class="text-sm font-medium text-gray-600">Customer Name *</label>
+                                {{ customer_form.customer_name }}
+                            </div>
+                            <div class="flex flex-col">
+                                <label for="id_phone_1" class="text-sm font-medium text-gray-600">Phone Number (Primary) *</label>
+                                {{ customer_form.phone_1 }}
+                            </div>
+                            <div class="flex flex-col">
+                                <label for="id_phone_2" class="text-sm font-medium text-gray-600">Phone Number (Secondary)</label>
+                                {{ customer_form.phone_2 }}
+                            </div>
+                            <div class="flex flex-col">
+                                <label for="id_email" class="text-sm font-medium text-gray-600">Email</label>
+                                {{ customer_form.email }}
+                            </div>
+                            <div class="flex flex-col">
+                                <label for="id_aadhaar_card_no" class="text-sm font-medium text-gray-600">Aadhaar Number</label>
+                                {{ customer_form.aadhaar_card_no }}
+                            </div>
+                            <div class="flex flex-col">
+                                <label for="id_national_id" class="text-sm font-medium text-gray-600">National ID</label>
+                                {{ customer_form.national_id }}
+                            </div>
+                            <div class="flex flex-col">
+                                <label for="id_passport_no" class="text-sm font-medium text-gray-600">Passport Number</label>
+                                {{ customer_form.passport_no }}
+                            </div>
+                            <div class="flex flex-col sm:col-span-2">
+                                <label for="id_address" class="text-sm font-medium text-gray-600">Address</label>
+                                {{ customer_form.address }}
+                            </div>
+                        </div>
+                        <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                            <button type="submit" 
+                                    class="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 transition duration-150 text-sm">
+                                Save Customer & Continue
+                            </button>
+                            <button type="button" id="back-to-search-btn" 
+                                    class="bg-gray-400 text-white px-3 py-1 rounded-md hover:bg-gray-500 transition duration-150 text-sm">
+                                Back to Search
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                <!-- Registration Form -->
+                <div id="registration-form-section" style="display: none;" class="form-section">
+                    <h6 class="text-lg font-medium text-gray-700 mb-4 text-center">Add Registration</h6>
+                    <div id="selected-customer-info" class="bg-blue-50 p-3 rounded-md mb-4" style="display: none;">
+                        <p class="text-sm text-gray-700"><strong>Customer:</strong> <span id="display-customer-name"></span></p>
+                        <p class="text-sm text-gray-700"><strong>Phone:</strong> <span id="display-customer-phone"></span></p>
+                    </div>
+                    <form id="registration-form" method="POST" class="space-y-4">
+                        {% csrf_token %}
+                        <input type="hidden" name="registration_submit" value="1">
+                        <input type="hidden" id="hidden-customer-id" name="customer" value="">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            {% for field in registration_form %}
+                                {% if field.name != 'customer' %}
+                                <div class="flex flex-col">
+                                    <label for="{{ field.id_for_label }}" class="text-sm font-medium text-gray-600">{{ field.label }}</label>
+                                    {% if field.name == 'phone1' %}
+                                        <input type="tel" 
+                                               name="{{ field.name }}" 
+                                               id="{{ field.id_for_label }}" 
+                                               class="form-control rounded-md border-gray-300 focus:ring-2 focus:ring-blue-400 py-2"
+                                               value="{{ field.value|default_if_none:'' }}"
+                                               pattern="[0-9]{10,15}"
+                                               maxlength="15"
+                                               placeholder="Enter phone number"
+                                               required>
+                                    {% else %}
+                                        {{ field }}
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        <div class="flex justify-center gap-3">
+                            <button type="submit" 
+                                    class="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600 transition duration-150 text-sm">
+                                Save Registration
+                            </button>
+                            <button type="button" id="back-to-customer-btn" 
+                                    class="bg-gray-400 text-white px-3 py-1 rounded-md hover:bg-gray-500 transition duration-150 text-sm">
+                                Back
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="modal-footer bg-gray-50 border-t">
+               
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="{% static 'images/css/registration_add.css' %}"> 
+<script src="{% static 'images/js/registration_add.js' %}"></script>
+
+
+<script>
+    window.registrationAddUrl = "{% url 'registration_add' %}";
+</script>
+{% endblock %}
+
