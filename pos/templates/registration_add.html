@@ -143,8 +143,14 @@
 
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
-<link rel="stylesheet" href="{% static 'images/css/registration_add.css' %}"> 
-<script src="{% static 'images/js/registration_add.js' %}"></script>
+
+<link rel="preload" href="{% static 'images/css/registration_add.css' %}" as="style">
+<link rel="stylesheet" href="{% static 'images/css/registration_add.css' %}" media="all">
+
+<link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"></noscript>
+
+<script defer src="{% static 'images/js/registration_add.js' %}"></script>
 
 
 <script>

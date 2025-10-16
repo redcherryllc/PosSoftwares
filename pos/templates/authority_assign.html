@@ -135,8 +135,13 @@
     </form>
 </div>
 
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-<link rel="stylesheet" href="{% static 'images/css/authority_style.css' %}">
-<script src="{% static 'images/js/authority_script.js' %}"></script>
+<link rel="preload" href="{% static 'images/css/authority_style.css' %}" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="{% static 'images/css/authority_style.css' %}"></noscript>
+
+<link rel="preload" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"></noscript>
+
+<script defer src="{% static 'images/js/authority_script.js' %}"></script>
+
 
 {% endblock %}
