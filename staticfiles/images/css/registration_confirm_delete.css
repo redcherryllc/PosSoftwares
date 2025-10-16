@@ -1,0 +1,240 @@
+ :root {
+        --primary-color: #dc2626;
+        --primary-hover: #b91c1c;
+        --secondary-color: #6b7280;
+        --secondary-hover: #4b5563;
+        --light-bg: #f8fafc;
+        --border-color: #e2e8f0;
+        --text-primary: #1f2937;
+        --text-secondary: #6b7280;
+        --success-bg: #f0fdf4;
+        --success-text: #15803d;
+        --error-bg: #fef2f2;
+        --error-text: #991b1b;
+        --info-bg: #eff6ff;
+        --info-text: #1e40af;
+    }
+
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--light-bg);
+        color: var(--text-primary);
+        line-height: 1.5;
+    }
+
+    .container {
+        max-width: 768px;
+        margin: 0 auto;
+        padding: 1.5rem;
+    }
+
+    .header {
+        margin-bottom: 1.5rem;
+    }
+
+    .header h1 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .header h1 i {
+        color: var(--primary-color);
+        margin-right: 0.5rem;
+    }
+
+    .messages {
+        margin-bottom: 1.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .message {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    .message.error {
+        background-color: var(--error-bg);
+        color: var(--error-text);
+    }
+
+    .message.success {
+        background-color: var(--success-bg);
+        color: var(--success-text);
+    }
+
+    .message.info {
+        background-color: var(--info-bg);
+        color: var(--info-text);
+    }
+
+    .message i {
+        margin-right: 0.5rem;
+    }
+
+    .card {
+        background: white;
+        border: 1px solid var(--border-color);
+        border-radius: 0.75rem;
+        padding: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .card h2 {
+        font-size: 1.125rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 1rem;
+    }
+
+    .card h2 i {
+        color: #2563eb;
+        margin-right: 0.5rem;
+    }
+
+    .card p {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+        margin-bottom: 1.5rem;
+        text-align: center;
+    }
+
+    .card p .booking-id {
+        font-weight: 500;
+        color: var(--text-primary);
+    }
+
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        justify-content: center;
+    }
+
+    .btn-primary {
+        background-color: var(--primary-color);
+        color: white;
+        font-weight: 500;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.875rem;
+        border: none;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .btn-primary:hover {
+        background-color: var(--primary-hover);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .btn-primary i {
+        margin-right: 0.5rem;
+    }
+
+    .cancel-link {
+        background-color: var(--secondary-color);
+        color: white;
+        font-weight: 500;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.875rem;
+        text-decoration: none;
+        transition: all 0.3s ease;
+    }
+
+    .cancel-link:hover {
+        background-color: var(--secondary-hover);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .cancel-link i {
+        margin-right: 0.5rem;
+    }
+
+    @media (min-width: 640px) {
+        .header h1 {
+            font-size: 1.5rem;
+            justify-content: flex-start;
+        }
+
+        .card {
+            padding: 2rem;
+        }
+
+        .card h2 {
+            font-size: 1.25rem;
+            justify-content: flex-start;
+        }
+
+        .card p {
+            font-size: 1rem;
+            text-align: left;
+        }
+
+        .form-group {
+            flex-direction: row;
+            gap: 1rem;
+            justify-content: flex-start;
+        }
+
+        .btn-primary, .cancel-link {
+            width: auto;
+        }
+    }
+
+    @media (min-width: 1024px) {
+        .header h1 {
+            font-size: 1.875rem;
+        }
+
+        .card h2 {
+            font-size: 1.5rem;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .container {
+            padding: 1rem;
+        }
+
+        .card {
+            padding: 1rem;
+        }
+
+        .btn-primary, .cancel-link {
+            width: 100%;
+            text-align: center;
+        }
+    }
