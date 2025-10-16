@@ -37,11 +37,11 @@
                     <option disabled>No Tables</option>
                 {% endfor %}
             </select>
-            <select class="nav-button dropdown" name="room_select">
-                <option value="" disabled selected>🏨 Room</option>
+            <select class="nav-button dropdown" name="room_select" id="room_select">
+                <option value="" disabled {% if not selected_room_id %}selected{% endif %}>🏨 Room</option>
                 {% for room in rooms %}
                     <option value="{{ room.room_id }}"
-                            {% if selected_room_id == room.room_id %}selected{% endif %}>
+                            {% if selected_room_id == room.room_id|add:"0" %}selected{% endif %}>
                         {{ room.room_name }} ({{ room.location }})
                     </option>
                 {% empty %}
@@ -210,14 +210,27 @@
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-     <script>
- 
-        window.registrationAddUrl = "{% url 'registration_add' %}";
-        window.addCustomerUrl = "{% url 'add_customer' %}";
-        window.nextSaleNo = "{{ next_sale_no }}";
-        window.selectedRoomId = "{{ selected_room_id|default:'' }}";
-    </script>
+
     <script src="{% static 'images/js/home.js' %}"></script>
+
+    <script>
+        window.registrationAddUrl = '{% url "registration_add" %}';
+        window.addCustomerUrl = '{% url "add_customer" %}';
+        window.getCustomersUrl = '/api/customers/';
+        window.nextSaleNo = '{{ next_sale_no }}';
+        window.selectedRoomId = '{{ selected_room_id|default:"" }}';
+        window.homeUrl = '{% url "home" %}';
+    </script>
+     <script>
+        window.POS = {
+            registrationAddUrl: '{% url 'registration_add' %}',
+            addCustomerUrl: '{% url 'add_customer' %}',
+            getCustomersUrl: '/api/customers/',
+            nextSaleNo: '{{ next_sale_no }}',
+            selectedRoomId: '{{ selected_room_id|default:"" }}'
+        };
+    </script>
+
 </body>
 </html>
 </body>
