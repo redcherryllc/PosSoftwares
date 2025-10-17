@@ -1709,7 +1709,7 @@ def home_view(request):
     business_unit_id = request.session.get('business_unit_id')
     branch_id = request.session.get('branch_id')
     
-    # Clear selected_room_id if clear_room=1 is in GET or POST
+   
     clear_room = request.GET.get('clear_room') or request.POST.get('clear_room')
     if clear_room == '1':
         request.session.pop('selected_room_id', None)
@@ -1741,32 +1741,28 @@ def home_view(request):
         customer_form = CustomerForm(business_unit=business_unit)
         registration_form = RegistrationForm(business_unit=business_unit)
 
-        # Handle room selection from admin panel (POST request)
+
         if request.method == 'POST' and 'room_id' in request.POST:
             selected_room_id = request.POST.get('room_id')
-            if selected_room_id:  # Only set if a valid room_id is provided
+            if selected_room_id: 
                 request.session['selected_room_id'] = selected_room_id
             else:
                 request.session.pop('selected_room_id', None)
             request.session.modified = True
             return JsonResponse({'status': 'success'})
 
-        # Validate selected_room_id if it exists
+       
         selected_room = None
         if selected_room_id:
             try:
                 selected_room = Rooms.objects.get(room_id=selected_room_id, business_unit=business_unit)
             except Rooms.DoesNotExist:
-                # Room doesn't exist, clear the session
+               
                 selected_room_id = None
                 request.session.pop('selected_room_id', None)
                 request.session.modified = True
 
-        # REMOVED: Auto-selection of first room
-        # No longer automatically selecting a room if none is selected
-        # The room should only be set when explicitly selected from admin panel
-
-        # Use current date in IST
+    
         today = timezone.now().date()
         logger.debug(f"Current date in home_view: {today}")
         today_sales_count = SalesHeader.objects.filter(
@@ -1868,7 +1864,7 @@ def home_view(request):
             'registration_form': registration_form,
             'next_sale_no': next_sale_no,
             'allowed_menu_items': allowed_menu_items,
-            'selected_room_id': selected_room_id,  # Will be None if not explicitly selected
+            'selected_room_id': selected_room_id, 
             'selected_room': selected_room,
         }
         return render(request, 'home.html', context)
