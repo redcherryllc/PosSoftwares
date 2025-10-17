@@ -1887,6 +1887,7 @@ def home_view(request):
             'allowed_menu_items': allowed_menu_items,
             'selected_room_id': selected_room_id,  
             'selected_room': selected_room,
+            'selected_room_id': request.session.get('room_id', ''),
         }
         
         logger.debug(f"Context selected_room_id: {selected_room_id} (type: {type(selected_room_id)})")
