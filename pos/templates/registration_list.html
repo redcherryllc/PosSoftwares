@@ -40,7 +40,7 @@
                 <thead>
                     <tr>
                         <th>Booking ID</th>
-                        <th>Customer ID</th>
+                        <th>Customer </th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -48,7 +48,7 @@
                     {% for registration in page_obj %}
                         <tr>
                             <td>{{ registration.booking_id }}</td>
-                            <td>{{ registration.customer_id }}</td>
+                            <td>{{ registration.customer }}</td>
                             <td class="actions">
                                 <a href="{% url 'registration_edit' registration.pk %}" class="action-icon" title="Edit Registration">
                                     <i class="fas fa-edit"></i>

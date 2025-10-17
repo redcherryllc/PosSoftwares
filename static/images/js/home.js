@@ -35,42 +35,11 @@ document.addEventListener('DOMContentLoaded', function() {
             currentServiceType = 'ROOM';
             currentServiceId = selectedRoomIdFromTemplate;
             console.log('Room selected:', roomSelect.find('option:selected').text());
-            roomSelect.change(); // Trigger change to ensure session update
         } else {
             console.warn('Room option not found in dropdown:', selectedRoomIdFromTemplate);
-            // Fetch room details and add option if not found
-            fetch(`/api/rooms/${selectedRoomIdFromTemplate}`, {
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken')
-                }
-            })
-            .then(res => {
-                if (!res.ok) {
-                    throw new Error(`HTTP error! Status: ${res.status}`);
-                }
-                return res.json();
-            })
-            .then(room => {
-                if (room.room_name && room.location) {
-                    roomSelect.append(`<option value="${selectedRoomIdFromTemplate}">${room.room_name} (${room.location})</option>`);
-                    roomSelect.val(selectedRoomIdFromTemplate);
-                    currentServiceType = 'ROOM';
-                    currentServiceId = selectedRoomIdFromTemplate;
-                    console.log('Fetched and added room to dropdown:', selectedRoomIdFromTemplate, room.room_name, room.location);
-                    roomSelect.change(); // Trigger change to ensure session update
-                } else {
-                    console.warn('Room details missing in API response');
-                    roomSelect.val('');
-                    currentServiceType = '';
-                    currentServiceId = 0;
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching room details:', error);
-                roomSelect.val('');
-                currentServiceType = '';
-                currentServiceId = 0;
-            });
+            roomSelect.val('');
+            currentServiceType = '';
+            currentServiceId = 0;
         }
     } else {
         console.log('No selected room ID, resetting room_select');
