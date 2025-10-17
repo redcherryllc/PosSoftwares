@@ -37,17 +37,19 @@
                     <option disabled>No Tables</option>
                 {% endfor %}
             </select>
+
             <select class="nav-button dropdown" name="room_select" id="room_select">
-                <option value="" disabled {% if not selected_room_id %}selected{% endif %}>🏨 Room</option>
-                {% for room in rooms %}
-                    <option value="{{ room.room_id }}"
-                            {% if selected_room_id == room.room_id %}selected{% endif %}>
-                        {{ room.room_name }} ({{ room.location }})
-                    </option>
-                {% empty %}
-                    <option disabled>No Rooms</option>
-                {% endfor %}
-            </select>
+    <option value="" disabled {% if not selected_room_id %}selected{% endif %}>🏨 Room</option>
+    {% for room in rooms %}
+        <option value="{{ room.room_id }}"
+                {% if selected_room_id and selected_room_id|stringformat:"s" == room.room_id|stringformat:"s" %}selected{% endif %}>
+            {{ room.room_name }} ({{ room.location }})
+        </option>
+    {% empty %}
+        <option disabled>No Rooms</option>
+    {% endfor %}
+</select>
+
             <button class="nav-button all" onclick="filterItems('all')">Menu List</button>
             <select class="nav-button dropdown" name="vehicle_select">
                 <option value="" disabled selected>🚗 Vehicle</option>
@@ -214,13 +216,20 @@
     <script src="{% static 'images/js/home.js' %}"></script>
 
     <script>
-        window.registrationAddUrl = '{% url "registration_add" %}';
-        window.addCustomerUrl = '{% url "add_customer" %}';
-        window.getCustomersUrl = '/api/customers/';
-        window.nextSaleNo = '{{ next_sale_no }}';
-        window.selectedRoomId = '{{ selected_room_id|default:"" }}';
-        window.homeUrl = '{% url "home" %}';
-    </script>
+    window.registrationAddUrl = '{% url "registration_add" %}';
+    window.addCustomerUrl = '{% url "add_customer" %}';
+    window.getCustomersUrl = '/api/customers/';
+    window.nextSaleNo = '{{ next_sale_no }}';
+    window.selectedRoomId = '{{ selected_room_id|default:"" }}'.trim();
+    window.homeUrl = '{% url "home" %}';
+    
+   
+    console.log('Template Variables:', {
+        selectedRoomId: window.selectedRoomId,
+        nextSaleNo: window.nextSaleNo,
+        homeUrl: window.homeUrl
+    });
+</script>
     
 
 </body>

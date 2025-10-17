@@ -6,7 +6,9 @@ let currentServiceId = 0;
 let isRegistrationProcess = false;
 
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Selected room ID from template:', window.selectedRoomId);
+   
+    const selectedRoomIdFromTemplate = window.selectedRoomId ? String(window.selectedRoomId).trim() : '';
+    console.log('Selected room ID from template:', selectedRoomIdFromTemplate);
     console.log('next_sale_no from template:', window.nextSaleNo);
     console.log('Current client date:', new Date().toLocaleDateString('en-CA'));
     console.log('Client timezone offset:', new Date().getTimezoneOffset());
@@ -21,12 +23,24 @@ document.addEventListener('DOMContentLoaded', function() {
     customerSelect.val(customerSelect.find('option:contains("Walking Customer")').val() || '');
 
     const roomSelect = $('select[name="room_select"]');
-    if (window.selectedRoomId) {
-        console.log('Setting room_select to:', window.selectedRoomId);
-        roomSelect.val(window.selectedRoomId);
-        currentServiceType = 'ROOM';
-        currentServiceId = window.selectedRoomId;
-        console.log('Room selected:', roomSelect.find('option:selected').text());
+    if (selectedRoomIdFromTemplate) {
+        console.log('Setting room_select to:', selectedRoomIdFromTemplate);
+        
+        const matchingOption = roomSelect.find('option').filter(function() {
+            return String($(this).val()) === selectedRoomIdFromTemplate;
+        });
+        
+        if (matchingOption.length > 0) {
+            roomSelect.val(selectedRoomIdFromTemplate);
+            currentServiceType = 'ROOM';
+            currentServiceId = selectedRoomIdFromTemplate;
+            console.log('Room selected:', roomSelect.find('option:selected').text());
+        } else {
+            console.warn('Room option not found in dropdown:', selectedRoomIdFromTemplate);
+            roomSelect.val('');
+            currentServiceType = '';
+            currentServiceId = 0;
+        }
     } else {
         console.log('No selected room ID, resetting room_select');
         roomSelect.val('');
@@ -35,20 +49,25 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     $('select[name="table_select"]').change(function() {
-        currentServiceType = this.value ? 'TABLE' : '';
-        currentServiceId = this.value || 0;
-        if (this.value) {
+        const selectedValue = $(this).val();
+        currentServiceType = selectedValue ? 'TABLE' : '';
+        currentServiceId = selectedValue || 0;
+        if (selectedValue) {
             $('select[name="room_select"]').val('');
             $('select[name="vehicle_select"]').val('');
         }
     });
 
     $('select[name="room_select"]').change(function() {
-        currentServiceType = this.value ? 'ROOM' : '';
-        currentServiceId = this.value || 0;
-        if (this.value) {
+        const selectedValue = $(this).val();
+        currentServiceType = selectedValue ? 'ROOM' : '';
+        currentServiceId = selectedValue || 0;
+        
+        if (selectedValue) {
             $('select[name="table_select"]').val('');
             $('select[name="vehicle_select"]').val('');
+            
+            console.log('Room selected, updating session with room_id:', selectedValue);
             
             $.ajax({
                 url: window.homeUrl,
@@ -57,18 +76,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     'X-CSRFToken': getCookie('csrftoken')
                 },
                 data: {
-                    room_id: this.value
+                    room_id: selectedValue
                 },
                 success: function(response) {
-                    console.log('Room selection updated in session:', this.value);
+                    console.log('Room selection updated in session:', selectedValue);
                 },
                 error: function(xhr, status, error) {
-                    console.error('Error updating room selection:', xhr.status, error);
+                    console.error('Error updating room selection:', xhr.status, error, xhr.responseText);
                     alert('Error updating room selection. Please try again.');
                 }
             });
         } else {
-            
+            console.log('Room deselected, clearing session');
             $.ajax({
                 url: window.homeUrl,
                 method: 'POST',
@@ -89,9 +108,10 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     $('select[name="vehicle_select"]').change(function() {
-        currentServiceType = this.value ? 'VEHICLE' : '';
-        currentServiceId = this.value || 0;
-        if (this.value) {
+        const selectedValue = $(this).val();
+        currentServiceType = selectedValue ? 'VEHICLE' : '';
+        currentServiceId = selectedValue || 0;
+        if (selectedValue) {
             $('select[name="table_select"]').val('');
             $('select[name="room_select"]').val('');
         }
@@ -345,7 +365,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert('Registration completed successfully!');
                     currentRegistrationId = response.registration_id;
 
-                    
                     const customerSelect = $('select[name="customer_select"]');
                     customerSelect.empty().append('<option value="" disabled>👤 Customer</option>');
                     fetch(window.getCustomersUrl, {
@@ -376,18 +395,19 @@ document.addEventListener('DOMContentLoaded', function() {
                         alert('Error refreshing customer list. Please try again.');
                     });
 
-                    
                     const roomSelect = $('select[name="room_select"]');
                     let selectedRoomId = roomId || response.room_id; 
                     if (selectedRoomId) {
                         
-                        if (roomSelect.find(`option[value="${selectedRoomId}"]`).length === 0) {
-                            
+                        selectedRoomId = String(selectedRoomId);
+                        
+                        if (roomSelect.find('option').filter(function() { 
+                            return String($(this).val()) === selectedRoomId; 
+                        }).length === 0) {
                             if (response.room_name && response.location) {
                                 roomSelect.append(`<option value="${selectedRoomId}">${response.room_name} (${response.location})</option>`);
                                 console.log('Added room to dropdown:', selectedRoomId, response.room_name, response.location);
                             } else {
-                                
                                 fetch(`/api/rooms/${selectedRoomId}`, {
                                     headers: {
                                         'X-CSRFToken': getCookie('csrftoken')
@@ -422,7 +442,6 @@ document.addEventListener('DOMContentLoaded', function() {
                             currentServiceId = selectedRoomId;
                             console.log('Room select updated to:', selectedRoomId, roomSelect.find('option:selected').text());
 
-                            
                             $.ajax({
                                 url: window.homeUrl,
                                 method: 'POST',
@@ -488,7 +507,7 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#customer-search-input').val('');
         $('#id_customer').val('');
         $('#id_phone1').val('');
-        $('#id_room').val(''); // Reset room selection in form
+        $('#id_room').val('');
         $('#customerModalLabel').text('Customer and Registration');
         $('#customer-form')[0].reset();
         $('#registration-form')[0].reset();
@@ -924,8 +943,6 @@ function initiatePayment() {
             alert('Error initiating payment. Please try again.');
         });
 }
-   
-
 
 function saveSaleForPayment() {
     return new Promise((resolve, reject) => {
@@ -1049,7 +1066,6 @@ function updateTime() {
     const now = new Date();
     document.getElementById('currentTime').textContent = now.toLocaleTimeString();
 }
-
 
 if (window.history.replaceState) {
     window.history.replaceState(null, null, window.location.pathname);

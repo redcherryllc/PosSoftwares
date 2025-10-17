@@ -1709,13 +1709,18 @@ def home_view(request):
     business_unit_id = request.session.get('business_unit_id')
     branch_id = request.session.get('branch_id')
     
-   
     clear_room = request.GET.get('clear_room') or request.POST.get('clear_room')
     if clear_room == '1':
         request.session.pop('selected_room_id', None)
         request.session.modified = True
+        logger.debug("Cleared selected_room_id from session")
     
     selected_room_id = request.session.get('selected_room_id')
+    if selected_room_id is not None:
+        selected_room_id = str(selected_room_id)
+        logger.debug(f"Selected room ID from session: {selected_room_id} (type: {type(selected_room_id)})")
+    else:
+        logger.debug("No selected room ID in session")
 
     try:
         if not all([saas_user_id, saas_customer_id, business_unit_group_id, business_unit_id, branch_id]):
@@ -1741,28 +1746,33 @@ def home_view(request):
         customer_form = CustomerForm(business_unit=business_unit)
         registration_form = RegistrationForm(business_unit=business_unit)
 
-
+        
         if request.method == 'POST' and 'room_id' in request.POST:
-            selected_room_id = request.POST.get('room_id')
-            if selected_room_id: 
-                request.session['selected_room_id'] = selected_room_id
+            room_id_value = request.POST.get('room_id', '').strip()
+            if room_id_value:
+                
+                request.session['selected_room_id'] = str(room_id_value)
+                logger.debug(f"Stored room_id in session: {room_id_value}")
             else:
                 request.session.pop('selected_room_id', None)
+                logger.debug("Cleared room_id from session (empty value)")
             request.session.modified = True
-            return JsonResponse({'status': 'success'})
+            return JsonResponse({'status': 'success', 'room_id': room_id_value or None})
 
-       
+        
         selected_room = None
         if selected_room_id:
             try:
-                selected_room = Rooms.objects.get(room_id=selected_room_id, business_unit=business_unit)
-            except Rooms.DoesNotExist:
-               
+                
+                selected_room = Rooms.objects.get(room_id=int(selected_room_id), business_unit=business_unit)
+                logger.debug(f"Found selected room: {selected_room.room_name} (ID: {selected_room.room_id})")
+            except (Rooms.DoesNotExist, ValueError) as e:
+                logger.warning(f"Selected room not found or invalid: {selected_room_id}, Error: {e}")
                 selected_room_id = None
                 request.session.pop('selected_room_id', None)
                 request.session.modified = True
 
-    
+        
         today = timezone.now().date()
         logger.debug(f"Current date in home_view: {today}")
         today_sales_count = SalesHeader.objects.filter(
@@ -1775,6 +1785,7 @@ def home_view(request):
         next_sale_no = f"{date_str}{next_seq_num}"
         logger.debug(f"Calculated next_sale_no: {next_sale_no}, business_unit_id: {business_unit_id}, branch_id: {branch_id}, today_sales_count: {today_sales_count}")
 
+        
         if request.method == 'POST':
             if 'customer_submit' in request.POST:
                 customer_form = CustomerForm(request.POST, business_unit=business_unit)
@@ -1814,21 +1825,31 @@ def home_view(request):
                     registration.update_remarks = ''
                     registration.austatus = ''
                     registration.save()
-                    return JsonResponse({
+                    
+                    
+                    response_data = {
                         'status': 'success',
                         'registration_id': registration.pk,
                         'customer_id': registration.customer_id
-                    })
+                    }
+                    
+                    if registration.room:
+                        response_data['room_id'] = str(registration.room.room_id)
+                        response_data['room_name'] = registration.room.room_name
+                        response_data['location'] = registration.room.location
+                    
+                    return JsonResponse(response_data)
                 else:
                     return JsonResponse({
                         'status': 'error',
                         'errors': registration_form.errors.as_json()
                     })
 
+       
         if request.GET.get('action') == 'search_customer':
             query = request.GET.get('q', '')
             logger.debug(f"Customer search query: {query}, business_unit_id: {business_unit_id}")
-            customers = Customer.objects.filter(
+            customers_found = Customer.objects.filter(
                 business_unit_id=business_unit_id
             ).filter(
                 Q(customer_name__icontains=query) |
@@ -1841,7 +1862,7 @@ def home_view(request):
                     'name': c.customer_name,
                     'phone': c.phone_1,
                     'aadhaar': c.aadhaar_card_no or 'N/A'
-                } for c in customers
+                } for c in customers_found
             ]
             return JsonResponse({
                 'status': 'success',
@@ -1864,15 +1885,18 @@ def home_view(request):
             'registration_form': registration_form,
             'next_sale_no': next_sale_no,
             'allowed_menu_items': allowed_menu_items,
-            'selected_room_id': selected_room_id, 
+            'selected_room_id': selected_room_id,  
             'selected_room': selected_room,
         }
+        
+        logger.debug(f"Context selected_room_id: {selected_room_id} (type: {type(selected_room_id)})")
         return render(request, 'home.html', context)
 
     except Exception as e:
-        logger.error(f"Error in home_view: {str(e)}")
+        logger.error(f"Error in home_view: {str(e)}", exc_info=True)
         messages.error(request, f"Error: {str(e)}")
-        return redirect('login')    
+        return redirect('login')
+  
 
 
 
@@ -1948,15 +1972,15 @@ def save_sale(request):
         business_unit = BusinessUnit.objects.get(business_unit_id=business_unit_id)
         branch = Branch.objects.get(branch_id=branch_id)
 
-        # Determine customer: prioritize registration customer if registration_id is provided
+        
         customer = None
         room = None
         registration = None
         if registration_id:
             try:
                 registration = Registration.objects.get(pk=registration_id)
-                customer = registration.customer  # Assuming Registration has a ForeignKey to Customer
-                room = registration.room  # Assuming Registration has a ForeignKey to Rooms
+                customer = registration.customer  
+                room = registration.room 
             except Registration.DoesNotExist:
                 logger.error("Registration not found: registration_id=%s", registration_id)
                 return JsonResponse({'success': False, 'error': 'Registration not found.'})
@@ -1968,7 +1992,7 @@ def save_sale(request):
                     logger.error("Customer not found: customer_id=%s", customer_id)
                     return JsonResponse({'success': False, 'error': 'Customer not found.'})
             else:
-                # Fallback to Walking Customer
+               
                 try:
                     customer = Customer.objects.get(
                         business_unit_id=business_unit_id,
