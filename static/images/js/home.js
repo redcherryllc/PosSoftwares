@@ -924,6 +924,8 @@ function initiatePayment() {
             alert('Error initiating payment. Please try again.');
         });
 }
+   
+
 
 function saveSaleForPayment() {
     return new Promise((resolve, reject) => {

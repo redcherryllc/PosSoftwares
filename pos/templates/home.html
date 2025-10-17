@@ -41,7 +41,7 @@
                 <option value="" disabled {% if not selected_room_id %}selected{% endif %}>🏨 Room</option>
                 {% for room in rooms %}
                     <option value="{{ room.room_id }}"
-                            {% if selected_room_id == room.room_id|add:"0" %}selected{% endif %}>
+                            {% if selected_room_id == room.room_id %}selected{% endif %}>
                         {{ room.room_name }} ({{ room.location }})
                     </option>
                 {% empty %}
@@ -224,7 +224,4 @@
     
 
 </body>
-</html>
-</body>
-<!--home-->
 </html>
