@@ -223,14 +223,129 @@
     window.selectedRoomId = '{{ selected_room_id|default:"" }}'.trim();
     window.homeUrl = '{% url "home" %}';
     
-   
+    
     console.log('Template Variables:', {
         selectedRoomId: window.selectedRoomId,
         nextSaleNo: window.nextSaleNo,
         homeUrl: window.homeUrl
     });
+
+    // Initialize room selection on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        const roomSelect = document.querySelector('select[name="room_select"]');
+        const selectedRoomIdFromTemplate = window.selectedRoomId ? String(window.selectedRoomId).trim() : '';
+        
+        console.log('Selected room ID from template:', selectedRoomIdFromTemplate);
+        
+        if (selectedRoomIdFromTemplate) {
+            const matchingOption = roomSelect.querySelector(`option[value="${selectedRoomIdFromTemplate}"]`);
+            if (matchingOption) {
+                roomSelect.value = selectedRoomIdFromTemplate;
+                window.currentServiceType = 'ROOM';
+                window.currentServiceId = selectedRoomIdFromTemplate;
+                console.log('Room selected:', roomSelect.selectedOptions[0].text);
+
+                // Update session with selected room_id
+                fetch(window.homeUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({ room_id: selectedRoomIdFromTemplate })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    console.log('Room selection updated in session:', selectedRoomIdFromTemplate);
+                })
+                .catch(error => {
+                    console.error('Error updating room selection:', error);
+                    alert('Error updating room selection. Please try again.');
+                });
+            } else {
+                console.warn('Room option not found in dropdown:', selectedRoomIdFromTemplate);
+                roomSelect.value = '';
+                window.currentServiceType = '';
+                window.currentServiceId = 0;
+            }
+        } else {
+            console.log('No selected room ID, resetting room_select');
+            roomSelect.value = '';
+            window.currentServiceType = '';
+            window.currentServiceId = 0;
+        }
+
+        // Handle room selection changes
+        roomSelect.addEventListener('change', function() {
+            const selectedValue = this.value;
+            window.currentServiceType = selectedValue ? 'ROOM' : '';
+            window.currentServiceId = selectedValue || 0;
+
+            if (selectedValue) {
+                // Clear other service selections
+                document.querySelector('select[name="table_select"]').value = '';
+                document.querySelector('select[name="vehicle_select"]').value = '';
+                
+                console.log('Room selected, updating session with room_id:', selectedValue);
+                
+                fetch(window.homeUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({ room_id: selectedValue })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    console.log('Room selection updated in session:', selectedValue);
+                })
+                .catch(error => {
+                    console.error('Error updating room selection:', error);
+                    alert('Error updating room selection. Please try again.');
+                });
+            } else {
+                console.log('Room deselected, clearing session');
+                fetch(window.homeUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({ clear_room: '1' })
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    console.log('Cleared room selection from session');
+                })
+                .catch(error => {
+                    console.error('Error clearing room selection:', error);
+                });
+            }
+        });
+    });
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
 </script>
-    
 
 </body>
 </html>
