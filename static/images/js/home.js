@@ -24,33 +24,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (window.selectedRoomId) {
         console.log('Setting room_select to:', window.selectedRoomId);
         roomSelect.val(window.selectedRoomId);
-        if (roomSelect.val() === window.selectedRoomId) {
-            currentServiceType = 'ROOM';
-            currentServiceId = window.selectedRoomId;
-            console.log('Room selected:', roomSelect.find('option:selected').text());
-        } else {
-            console.warn('Selected room ID not found in dropdown options:', window.selectedRoomId);
-            roomSelect.val('');
-            currentServiceType = '';
-            currentServiceId = 0;
-            
-            $.ajax({
-                url: window.homeUrl,
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken')
-                },
-                data: {
-                    clear_room: '1'
-                },
-                success: function(response) {
-                    console.log('Cleared invalid room selection from session');
-                },
-                error: function(xhr, status, error) {
-                    console.error('Error clearing room selection:', xhr.status, error);
-                }
-            });
-        }
+        currentServiceType = 'ROOM';
+        currentServiceId = window.selectedRoomId;
+        console.log('Room selected:', roomSelect.find('option:selected').text());
     } else {
         console.log('No selected room ID, resetting room_select');
         roomSelect.val('');
