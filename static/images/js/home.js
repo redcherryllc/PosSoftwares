@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('Current client date:', new Date().toLocaleDateString('en-CA'));
     console.log('Client timezone offset:', new Date().getTimezoneOffset());
 
-    clearSale();
+    clearSale(true);  // Preserve selects on initial load to keep preselected values (e.g., room)
 
     $('#customer-search-section').hide();
     $('#customer-form-section').hide();
@@ -23,8 +23,13 @@ document.addEventListener('DOMContentLoaded', function() {
     customerSelect.val(customerSelect.find('option:contains("Walking Customer")').val() || '');
 
     const roomSelect = $('select[name="room_select"]');
-    if (selectedRoomIdFromTemplate) {
-        console.log('Setting room_select to:', selectedRoomIdFromTemplate);
+    const roomVal = roomSelect.val();  // Get the current value after preservation
+    if (roomVal && selectedRoomIdFromTemplate && String(roomVal) === selectedRoomIdFromTemplate) {
+        currentServiceType = 'ROOM';
+        currentServiceId = roomVal;
+        console.log('Preserved pre-selected room:', roomSelect.find('option:selected').text());
+    } else if (selectedRoomIdFromTemplate) {
+        console.log('Attempting to set room_select to:', selectedRoomIdFromTemplate);
         
         const matchingOption = roomSelect.find('option').filter(function() {
             return String($(this).val()) === selectedRoomIdFromTemplate;
@@ -42,8 +47,7 @@ document.addEventListener('DOMContentLoaded', function() {
             currentServiceId = 0;
         }
     } else {
-        console.log('No selected room ID, resetting room_select');
-        roomSelect.val('');
+        console.log('No selected room ID, ensuring room_select is reset if needed');
         currentServiceType = '';
         currentServiceId = 0;
     }
@@ -682,7 +686,7 @@ function addToKeypad(value) {
     keypadInput += value;
 }
 
-function clearSale() {
+function clearSale(preserveSelects = false) {
     currentSaleItems = [];
     keypadInput = '';
     currentRegistrationId = null;
@@ -690,9 +694,11 @@ function clearSale() {
     currentServiceId = 0;
     updateSalesTable();
     updateSaleTotal();
-    $('select[name="table_select"]').val('');
-    $('select[name="room_select"]').val('');
-    $('select[name="vehicle_select"]').val('');
+    if (!preserveSelects) {
+        $('select[name="table_select"]').val('');
+        $('select[name="room_select"]').val('');
+        $('select[name="vehicle_select"]').val('');
+    }
     $('select[name="customer_select"]').val($('select[name="customer_select"]').find('option:contains("Walking Customer")').val() || '');
     refreshNextSaleNo();
 }
