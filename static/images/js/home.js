@@ -512,7 +512,7 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#customer-search-input').val('');
         $('#id_customer').val('');
         $('#id_phone1').val('');
-        $('#id_room').val(''); 
+        $('#id_room').val(''); // Reset room selection in form
         $('#customerModalLabel').text('Customer and Registration');
         $('#customer-form')[0].reset();
         $('#registration-form')[0].reset();
@@ -1071,6 +1071,7 @@ function updateTime() {
     const now = new Date();
     document.getElementById('currentTime').textContent = now.toLocaleTimeString();
 }
+
 
 if (window.history.replaceState) {
     window.history.replaceState(null, null, window.location.pathname);

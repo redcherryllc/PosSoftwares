@@ -221,17 +221,8 @@
         window.selectedRoomId = '{{ selected_room_id|default:"" }}';
         window.homeUrl = '{% url "home" %}';
     </script>
-     <script>
-        window.POS = {
-            registrationAddUrl: '{% url 'registration_add' %}',
-            addCustomerUrl: '{% url 'add_customer' %}',
-            getCustomersUrl: '/api/customers/',
-            nextSaleNo: '{{ next_sale_no }}',
-            selectedRoomId: '{{ selected_room_id|default:"" }}'
-        };
-    </script>
-
     
+
 </body>
 </html>
 </body>
