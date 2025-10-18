@@ -6,7 +6,6 @@ let currentServiceId = 0;
 let isRegistrationProcess = false;
 
 document.addEventListener('DOMContentLoaded', function() {
-   
     console.log('next_sale_no from template:', window.nextSaleNo);
     console.log('Current client date:', new Date().toLocaleDateString('en-CA'));
     console.log('Client timezone offset:', new Date().getTimezoneOffset());
@@ -61,13 +60,13 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#customerModalLabel').text('Customer and Registration');
         
         const roomSelect = $('select[name="room_select"]');
-        const selectedRoomId = roomSelect.val();
+        const selectedRoomId = window.currentServiceId || roomSelect.val();
         if (selectedRoomId && $('#id_room').find(`option[value="${selectedRoomId}"]`).length > 0) {
             $('#id_room').val(selectedRoomId);
-            console.log('Pre-selected room in registration form:', selectedRoomId);
+            console.log('Pre-selected room in registration form:', selectedRoomId, $('#id_room').find('option:selected').text());
         } else {
             $('#id_room').val('');
-            console.log('No room pre-selected in registration form');
+            console.log('No valid room pre-selected in registration form');
         }
     });
 
@@ -139,13 +138,13 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#customerModalLabel').text('Add Registration');
         
         const roomSelect = $('select[name="room_select"]');
-        const selectedRoomId = roomSelect.val();
+        const selectedRoomId = window.currentServiceId || roomSelect.val();
         if (selectedRoomId && $('#id_room').find(`option[value="${selectedRoomId}"]`).length > 0) {
             $('#id_room').val(selectedRoomId);
-            console.log('Pre-selected room in registration form:', selectedRoomId);
+            console.log('Pre-selected room in registration form:', selectedRoomId, $('#id_room').find('option:selected').text());
         } else {
             $('#id_room').val('');
-            console.log('No room pre-selected in registration form');
+            console.log('No valid room pre-selected in registration form');
         }
     });
 
@@ -164,20 +163,20 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#customerModalLabel').text('Add Registration');
         
         const roomSelect = $('select[name="room_select"]');
-        const selectedRoomId = roomSelect.val();
+        const selectedRoomId = window.currentServiceId || roomSelect.val();
         if (selectedRoomId && $('#id_room').find(`option[value="${selectedRoomId}"]`).length > 0) {
             $('#id_room').val(selectedRoomId);
-            console.log('Pre-selected room in registration form:', selectedRoomId);
+            console.log('Pre-selected room in registration form:', selectedRoomId, $('#id_room').find('option:selected').text());
         } else {
             $('#id_room').val('');
-            console.log('No room pre-selected in registration form');
+            console.log('No valid room pre-selected in registration form');
         }
     });
 
     $('#customer-form').submit(function(e) {
         e.preventDefault();
         const formData = $(this).serialize();
-        console.log('Form data being sent:', formData);
+        console.log('Customer form data being sent:', formData);
         const $form = $(this);
         const $submitBtn = $form.find('button[type="submit"]');
         $submitBtn.prop('disabled', true).text('Saving...');
@@ -230,13 +229,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         $('#customerModalLabel').text('Add Registration');
                         
                         const roomSelect = $('select[name="room_select"]');
-                        const selectedRoomId = roomSelect.val();
+                        const selectedRoomId = window.currentServiceId || roomSelect.val();
                         if (selectedRoomId && $('#id_room').find(`option[value="${selectedRoomId}"]`).length > 0) {
                             $('#id_room').val(selectedRoomId);
-                            console.log('Pre-selected room in registration form:', selectedRoomId);
+                            console.log('Pre-selected room in registration form:', selectedRoomId, $('#id_room').find('option:selected').text());
                         } else {
                             $('#id_room').val('');
-                            console.log('No room pre-selected in registration form');
+                            console.log('No valid room pre-selected in registration form');
                         }
                     } else {
                         alert('Customer added successfully!');
@@ -321,12 +320,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     const roomSelect = $('select[name="room_select"]');
                     let selectedRoomId = roomId || response.room_id; 
                     if (selectedRoomId) {
-                        
                         selectedRoomId = String(selectedRoomId);
-                        
-                        if (roomSelect.find('option').filter(function() { 
-                            return String($(this).val()) === selectedRoomId; 
-                        }).length === 0) {
+                        if (roomSelect.find(`option[value="${selectedRoomId}"]`).length === 0) {
                             if (response.room_name && response.location) {
                                 roomSelect.append(`<option value="${selectedRoomId}">${response.room_name} (${response.location})</option>`);
                                 console.log('Added room to dropdown:', selectedRoomId, response.room_name, response.location);
@@ -361,50 +356,17 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                         if (selectedRoomId) {
                             roomSelect.val(selectedRoomId);
-                            currentServiceType = 'ROOM';
-                            currentServiceId = selectedRoomId;
+                            window.currentServiceType = 'ROOM';
+                            window.currentServiceId = selectedRoomId;
                             console.log('Room select updated to:', selectedRoomId, roomSelect.find('option:selected').text());
-
-                            $.ajax({
-                                url: window.homeUrl,
-                                method: 'POST',
-                                headers: {
-                                    'X-CSRFToken': getCookie('csrftoken')
-                                },
-                                data: {
-                                    room_id: selectedRoomId
-                                },
-                                success: function() {
-                                    console.log('Session updated with room_id:', selectedRoomId);
-                                },
-                                error: function(xhr, status, error) {
-                                    console.error('Error updating session with room_id:', xhr.status, error, xhr.responseText);
-                                    alert('Error updating room selection. Please try again.');
-                                }
-                            });
+                            updateSessionRoom(selectedRoomId);
                         }
                     } else {
                         console.warn('No room_id found in form or response');
                         roomSelect.val(''); 
-                        currentServiceType = '';
-                        currentServiceId = 0;
-                        
-                        $.ajax({
-                            url: window.homeUrl,
-                            method: 'POST',
-                            headers: {
-                                'X-CSRFToken': getCookie('csrftoken')
-                            },
-                            data: {
-                                clear_room: '1'
-                            },
-                            success: function() {
-                                console.log('Cleared room selection from session');
-                            },
-                            error: function(xhr, status, error) {
-                                console.error('Error clearing room selection:', xhr.status, error);
-                            }
-                        });
+                        window.currentServiceType = '';
+                        window.currentServiceId = 0;
+                        clearSessionRoom();
                     }
 
                     $('#customerModal').modal('hide');
