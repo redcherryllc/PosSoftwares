@@ -37,17 +37,19 @@
                     <option disabled>No Tables</option>
                 {% endfor %}
             </select>
+
             <select class="nav-button dropdown" name="room_select" id="room_select">
-                <option value="" disabled {% if not selected_room_id %}selected{% endif %}>🏨 Room</option>
-                {% for room in rooms %}
-                    <option value="{{ room.room_id }}"
-                            {% if selected_room_id|stringformat:"s" == room.room_id|stringformat:"s" %}selected{% endif %}>
-                        {{ room.room_name }} ({{ room.location }})
-                    </option>
-                {% empty %}
-                    <option disabled>No Rooms</option>
-                {% endfor %}
-            </select>
+    <option value="" disabled {% if not selected_room_id %}selected{% endif %}>🏨 Room</option>
+    {% for room in rooms %}
+        <option value="{{ room.room_id }}"
+                {% if selected_room_id|stringformat:"s" == room.room_id|stringformat:"s" %}selected{% endif %}>
+            {{ room.room_name }} ({{ room.location }})
+        </option>
+    {% empty %}
+        <option disabled>No Rooms</option>
+    {% endfor %}
+</select>
+
             <button class="nav-button all" onclick="filterItems('all')">Menu List</button>
             <select class="nav-button dropdown" name="vehicle_select">
                 <option value="" disabled selected>🚗 Vehicle</option>
@@ -231,17 +233,18 @@
     
     document.addEventListener('DOMContentLoaded', function() {
         const roomSelect = document.querySelector('select[name="room_select"]');
-        const selectedRoomIdFromTemplate = window.selectedRoomId ? String(window.selectedRoomId).trim() : '';
-
+        const selectedRoomIdFromTemplate = window.selectedRoomId ? window.selectedRoomId.trim() : '';
+        
         console.log('Selected room ID from template:', selectedRoomIdFromTemplate);
-
+        
         if (selectedRoomIdFromTemplate) {
             const matchingOption = roomSelect.querySelector(`option[value="${selectedRoomIdFromTemplate}"]`);
             if (matchingOption) {
                 roomSelect.value = selectedRoomIdFromTemplate;
                 window.currentServiceType = 'ROOM';
                 window.currentServiceId = selectedRoomIdFromTemplate;
-                console.log('Room selected:', roomSelect.selectedOptions[0]?.text || 'Unknown');
+                console.log('Room selected:', roomSelect.selectedOptions[0].text);
+
                 
                 fetch(window.homeUrl, {
                     method: 'POST',
@@ -255,10 +258,7 @@
                     if (!response.ok) {
                         throw new Error(`HTTP error! Status: ${response.status}`);
                     }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('Room selection updated in session:', selectedRoomIdFromTemplate, data);
+                    console.log('Room selection updated in session:', selectedRoomIdFromTemplate);
                 })
                 .catch(error => {
                     console.error('Error updating room selection:', error);
@@ -269,48 +269,12 @@
                 roomSelect.value = '';
                 window.currentServiceType = '';
                 window.currentServiceId = 0;
-                
-                fetch(window.homeUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCookie('csrftoken')
-                    },
-                    body: JSON.stringify({ clear_room: '1' })
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! Status: ${response.status}`);
-                    }
-                    console.log('Cleared invalid room selection from session');
-                })
-                .catch(error => {
-                    console.error('Error clearing room selection:', error);
-                });
             }
         } else {
             console.log('No selected room ID, resetting room_select');
             roomSelect.value = '';
             window.currentServiceType = '';
             window.currentServiceId = 0;
-            
-            fetch(window.homeUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken')
-                },
-                body: JSON.stringify({ clear_room: '1' })
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! Status: ${response.status}`);
-                    }
-                    console.log('Cleared room selection from session on page load');
-                })
-                .catch(error => {
-                    console.error('Error clearing room selection on page load:', error);
-                });
         }
 
         
@@ -319,12 +283,12 @@
             window.currentServiceType = selectedValue ? 'ROOM' : '';
             window.currentServiceId = selectedValue || 0;
 
-            console.log('Room selection changed to:', selectedValue);
-
             if (selectedValue) {
-                
+               
                 document.querySelector('select[name="table_select"]').value = '';
                 document.querySelector('select[name="vehicle_select"]').value = '';
+                
+                console.log('Room selected, updating session with room_id:', selectedValue);
                 
                 fetch(window.homeUrl, {
                     method: 'POST',
@@ -338,10 +302,7 @@
                     if (!response.ok) {
                         throw new Error(`HTTP error! Status: ${response.status}`);
                     }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('Room selection updated in session:', selectedValue, data);
+                    console.log('Room selection updated in session:', selectedValue);
                 })
                 .catch(error => {
                     console.error('Error updating room selection:', error);
@@ -361,10 +322,7 @@
                     if (!response.ok) {
                         throw new Error(`HTTP error! Status: ${response.status}`);
                     }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('Cleared room selection from session:', data);
+                    console.log('Cleared room selection from session');
                 })
                 .catch(error => {
                     console.error('Error clearing room selection:', error);
@@ -379,7 +337,7 @@
             const cookies = document.cookie.split(';');
             for (let i = 0; i < cookies.length; i++) {
                 const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=') ) {
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
                     cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
                     break;
                 }

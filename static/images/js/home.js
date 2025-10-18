@@ -191,7 +191,7 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             success: function(response) {
                 console.log('Add customer response:', response);
-                if (response.status === 'success') {
+                if (response.status === 'success' && response.customer_id && response.customer_name) {
                     const customerSelect = $('select[name="customer_select"]');
                     customerSelect.append(`<option value="${response.customer_id}">${response.customer_name}</option>`);
                     customerSelect.val(response.customer_id);
@@ -200,16 +200,29 @@ document.addEventListener('DOMContentLoaded', function() {
                             'X-CSRFToken': getCookie('csrftoken')
                         }
                     })
-                    .then(res => res.json())
+                    .then(res => {
+                        if (!res.ok) {
+                            throw new Error(`HTTP error! Status: ${res.status}`);
+                        }
+                        return res.json();
+                    })
                     .then(customers => {
                         customerSelect.empty().append('<option value="" disabled>👤 Customer</option>');
                         customers.forEach(customer => {
-                            customerSelect.append(`<option value="${customer.customer_id}">${customer.customer_name}</option>`);
+                            const isSelected = customer.customer_id === response.customer_id ? 'selected' : '';
+                            customerSelect.append(`<option value="${customer.customer_id}" ${isSelected}>${customer.customer_name}</option>`);
                         });
+                    })
+                    .catch(error => {
+                        console.error('Error refreshing customers:', error);
+                        alert('Error refreshing customer list. Please try again.');
                     });
+
                     if (isRegistrationProcess) {
                         const registrationCustomerSelect = $('#id_customer');
-                        registrationCustomerSelect.append(`<option value="${response.customer_id}">${response.customer_name}</option>`);
+                        if (registrationCustomerSelect.find(`option[value="${response.customer_id}"]`).length === 0) {
+                            registrationCustomerSelect.append(`<option value="${response.customer_id}">${response.customer_name}</option>`);
+                        }
                         registrationCustomerSelect.val(response.customer_id);
                         $('#id_phone1').val(response.customer_phone || '');
                         $('#customer-form-section').hide();
@@ -231,13 +244,25 @@ document.addEventListener('DOMContentLoaded', function() {
                         $form[0].reset();
                     }
                 } else {
-                    alert('Error adding customer: ' + (response.errors ? JSON.stringify(response.errors) : 'Unknown error'));
+                    const errorMsg = response.error || 'Invalid response from server';
+                    alert('Error adding customer: ' + errorMsg);
                 }
                 $submitBtn.prop('disabled', false).text('Save Customer');
             },
             error: function(xhr, status, error) {
-                console.error('Error adding customer:', error);
-                alert('Error adding customer. Please try again.');
+                let errorMsg = 'Unknown error occurred';
+                try {
+                    const errorData = JSON.parse(xhr.responseText);
+                    errorMsg = errorData.error || errorData.errors || xhr.statusText || 'Unknown error';
+                } catch (e) {
+                    errorMsg = xhr.statusText || 'Unknown error';
+                }
+                console.error('Error adding customer:', {
+                    status: xhr.status,
+                    error: error,
+                    responseText: xhr.responseText
+                });
+                alert(`Error adding customer: ${errorMsg}. Please check the console for details.`);
                 $submitBtn.prop('disabled', false).text('Save Customer');
             }
         });
@@ -811,7 +836,7 @@ function printSale() {
             <hr>
             <div class="total">Subtotal: ₹${totals.subtotal.toFixed(2)}</div>
             <div class="total">Discount: ₹${totals.discount.toFixed(2)}</div>
-            <div class="total">Tax: ${totals.tax.toFixed(2)}</div>
+            <div class="total">Tax: ₹${totals.tax.toFixed(2)}</div>
             <div class="total">Grand Total: ₹${totals.grandTotal.toFixed(2)}</div>
         </body>
         </html>

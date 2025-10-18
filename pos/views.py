@@ -1701,6 +1701,19 @@ def get_customers(request):
 
 
 
+import json
+from django.http import JsonResponse
+from django.contrib import messages
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.db.models import Q
+from .forms import CustomerForm, RegistrationForm
+from .models import SAASUsers, SAASCustomer, BusinessUnitGroup, BusinessUnit, Branch, ProductGroup, Products, Tables, Rooms, Vehicle, Customer, SalesHeader
+from django.utils import timezone
+import logging
+
+logger = logging.getLogger(__name__)
+
 @login_required
 def home_view(request):
     saas_user_id = request.session.get('saas_user_id')
@@ -1718,18 +1731,40 @@ def home_view(request):
         logger.debug("Cleared selected_room_id from session")
         return redirect('home')
     
-   
-    if request.method == 'POST' and 'room_id' in request.POST:
-        room_id_value = request.POST.get('room_id', '').strip()
-        if room_id_value:
-            room_id_value = int(room_id_value)
-            request.session['selected_room_id'] = room_id_value
-            logger.debug(f"Stored room_id in session: {room_id_value}")
+    
+    if request.method == 'POST':
+        if request.content_type == 'application/json':
+            try:
+                data = json.loads(request.body)
+                room_id_value = data.get('room_id')
+                clear_room = data.get('clear_room')
+                if clear_room == '1':
+                    request.session.pop('selected_room_id', None)
+                    request.session.modified = True
+                    return JsonResponse({'status': 'success', 'room_id': None})
+                if room_id_value:
+                    room_id_value = int(room_id_value)
+                    request.session['selected_room_id'] = room_id_value
+                    request.session.modified = True
+                    return JsonResponse({'status': 'success', 'room_id': room_id_value})
+                else:
+                    request.session.pop('selected_room_id', None)
+                    request.session.modified = True
+                    return JsonResponse({'status': 'success', 'room_id': None})
+            except json.JSONDecodeError:
+                return JsonResponse({'status': 'error', 'message': 'Invalid JSON'}, status=400)
         else:
-            request.session.pop('selected_room_id', None)
-            logger.debug("Cleared room_id from session (empty value)")
-        request.session.modified = True
-        return JsonResponse({'status': 'success', 'room_id': room_id_value or None})
+            if 'room_id' in request.POST:
+                room_id_value = request.POST.get('room_id', '').strip()
+                if room_id_value:
+                    room_id_value = int(room_id_value)
+                    request.session['selected_room_id'] = room_id_value
+                    logger.debug(f"Stored room_id in session: {room_id_value}")
+                else:
+                    request.session.pop('selected_room_id', None)
+                    logger.debug("Cleared room_id from session (empty value)")
+                request.session.modified = True
+                return JsonResponse({'status': 'success', 'room_id': room_id_value or None})
 
     
     selected_room_id = request.session.get('selected_room_id')
@@ -1850,7 +1885,7 @@ def home_view(request):
                         'errors': registration_form.errors.as_json()
                     })
 
-       
+        
         if request.GET.get('action') == 'search_customer':
             query = request.GET.get('q', '')
             logger.debug(f"Customer search query: {query}, business_unit_id: {business_unit_id}")
@@ -1901,8 +1936,6 @@ def home_view(request):
         logger.error(f"Error in home_view: {str(e)}", exc_info=True)
         messages.error(request, f"Error: {str(e)}")
         return redirect('login')
-
-
 
 
 
