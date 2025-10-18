@@ -6,6 +6,7 @@ let currentServiceId = 0;
 let isRegistrationProcess = false;
 
 document.addEventListener('DOMContentLoaded', function() {
+   
     console.log('next_sale_no from template:', window.nextSaleNo);
     console.log('Current client date:', new Date().toLocaleDateString('en-CA'));
     console.log('Client timezone offset:', new Date().getTimezoneOffset());
@@ -190,40 +191,27 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             success: function(response) {
                 console.log('Add customer response:', response);
-                if (response.success && response.customer && response.customer.customer_id && response.customer.customer_name) {
+                if (response.status === 'success') {
                     const customerSelect = $('select[name="customer_select"]');
-                    customerSelect.append(`<option value="${response.customer.customer_id}">${response.customer.customer_name}</option>`);
-                    customerSelect.val(response.customer.customer_id);
+                    customerSelect.append(`<option value="${response.customer_id}">${response.customer_name}</option>`);
+                    customerSelect.val(response.customer_id);
                     fetch(window.getCustomersUrl, {
                         headers: {
                             'X-CSRFToken': getCookie('csrftoken')
                         }
                     })
-                    .then(res => {
-                        if (!res.ok) {
-                            throw new Error(`HTTP error! Status: ${res.status}`);
-                        }
-                        return res.json();
-                    })
+                    .then(res => res.json())
                     .then(customers => {
                         customerSelect.empty().append('<option value="" disabled>👤 Customer</option>');
                         customers.forEach(customer => {
-                            const isSelected = customer.customer_id === response.customer.customer_id ? 'selected' : '';
-                            customerSelect.append(`<option value="${customer.customer_id}" ${isSelected}>${customer.customer_name}</option>`);
+                            customerSelect.append(`<option value="${customer.customer_id}">${customer.customer_name}</option>`);
                         });
-                    })
-                    .catch(error => {
-                        console.error('Error refreshing customers:', error);
-                        alert('Error refreshing customer list. Please try again.');
                     });
-
                     if (isRegistrationProcess) {
                         const registrationCustomerSelect = $('#id_customer');
-                        if (registrationCustomerSelect.find(`option[value="${response.customer.customer_id}"]`).length === 0) {
-                            registrationCustomerSelect.append(`<option value="${response.customer.customer_id}">${response.customer.customer_name}</option>`);
-                        }
-                        registrationCustomerSelect.val(response.customer.customer_id);
-                        $('#id_phone1').val(response.customer.phone_1 || '');
+                        registrationCustomerSelect.append(`<option value="${response.customer_id}">${response.customer_name}</option>`);
+                        registrationCustomerSelect.val(response.customer_id);
+                        $('#id_phone1').val(response.customer_phone || '');
                         $('#customer-form-section').hide();
                         $('#registration-form-section').show();
                         $('#customerModalLabel').text('Add Registration');
@@ -243,25 +231,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         $form[0].reset();
                     }
                 } else {
-                    const errorMsg = response.error || 'Invalid response from server';
-                    alert('Error adding customer: ' + errorMsg);
+                    alert('Error adding customer: ' + (response.errors ? JSON.stringify(response.errors) : 'Unknown error'));
                 }
                 $submitBtn.prop('disabled', false).text('Save Customer');
             },
             error: function(xhr, status, error) {
-                let errorMsg = 'Unknown error occurred';
-                try {
-                    const errorData = JSON.parse(xhr.responseText);
-                    errorMsg = errorData.error || errorData.errors || xhr.statusText || 'Unknown error';
-                } catch (e) {
-                    errorMsg = xhr.statusText || 'Unknown error';
-                }
-                console.error('Error adding customer:', {
-                    status: xhr.status,
-                    error: error,
-                    responseText: xhr.responseText
-                });
-                alert(`Error adding customer: ${errorMsg}. Please check the console for details.`);
+                console.error('Error adding customer:', error);
+                alert('Error adding customer. Please try again.');
                 $submitBtn.prop('disabled', false).text('Save Customer');
             }
         });
@@ -270,7 +246,7 @@ document.addEventListener('DOMContentLoaded', function() {
     $('#registration-form').submit(function(e) {
         e.preventDefault();
         const formData = $(this).serialize();
-        const roomId = $('#id_room').val();
+        const roomId = $('#id_room').val(); 
         console.log('Registration form submitted with room_id:', roomId);
         console.log('Form data:', formData);
 
@@ -318,10 +294,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
 
                     const roomSelect = $('select[name="room_select"]');
-                    let selectedRoomId = response.room_id !== null ? String(response.room_id) : null;
-
+                    let selectedRoomId = roomId || response.room_id; 
                     if (selectedRoomId) {
-                        if (roomSelect.find(`option[value="${selectedRoomId}"]`).length === 0) {
+                        
+                        selectedRoomId = String(selectedRoomId);
+                        
+                        if (roomSelect.find('option').filter(function() { 
+                            return String($(this).val()) === selectedRoomId; 
+                        }).length === 0) {
                             if (response.room_name && response.location) {
                                 roomSelect.append(`<option value="${selectedRoomId}">${response.room_name} (${response.location})</option>`);
                                 console.log('Added room to dropdown:', selectedRoomId, response.room_name, response.location);
@@ -343,12 +323,14 @@ document.addEventListener('DOMContentLoaded', function() {
                                         console.log('Fetched and added room to dropdown:', selectedRoomId, room.room_name, room.location);
                                     } else {
                                         console.warn('Room details missing in API response');
-                                        selectedRoomId = null;
+                                        alert('Room selected but details not available. Please check room configuration.');
+                                        selectedRoomId = null; 
                                     }
                                 })
                                 .catch(error => {
                                     console.error('Error fetching room details:', error);
-                                    selectedRoomId = null;
+                                    alert('Error fetching room details. Please try again.');
+                                    selectedRoomId = null; 
                                 });
                             }
                         }
@@ -364,10 +346,11 @@ document.addEventListener('DOMContentLoaded', function() {
                                 headers: {
                                     'X-CSRFToken': getCookie('csrftoken')
                                 },
-                                data: JSON.stringify({ room_id: selectedRoomId }),
-                                contentType: 'application/json',
-                                success: function(data) {
-                                    console.log('Session updated with room_id:', selectedRoomId, data);
+                                data: {
+                                    room_id: selectedRoomId
+                                },
+                                success: function() {
+                                    console.log('Session updated with room_id:', selectedRoomId);
                                 },
                                 error: function(xhr, status, error) {
                                     console.error('Error updating session with room_id:', xhr.status, error, xhr.responseText);
@@ -376,23 +359,25 @@ document.addEventListener('DOMContentLoaded', function() {
                             });
                         }
                     } else {
-                        console.log('No room_id in response, clearing room selection');
-                        roomSelect.val('');
+                        console.warn('No room_id found in form or response');
+                        roomSelect.val(''); 
                         currentServiceType = '';
                         currentServiceId = 0;
+                        
                         $.ajax({
                             url: window.homeUrl,
                             method: 'POST',
                             headers: {
                                 'X-CSRFToken': getCookie('csrftoken')
                             },
-                            data: JSON.stringify({ clear_room: '1' }),
-                            contentType: 'application/json',
-                            success: function(data) {
-                                console.log('Cleared room selection from session:', data);
+                            data: {
+                                clear_room: '1'
+                            },
+                            success: function() {
+                                console.log('Cleared room selection from session');
                             },
                             error: function(xhr, status, error) {
-                                console.error('Error clearing room selection:', xhr.status, error, xhr.responseText);
+                                console.error('Error clearing room selection:', xhr.status, error);
                             }
                         });
                     }
@@ -826,7 +811,7 @@ function printSale() {
             <hr>
             <div class="total">Subtotal: ₹${totals.subtotal.toFixed(2)}</div>
             <div class="total">Discount: ₹${totals.discount.toFixed(2)}</div>
-            <div class="total">Tax: ₹${totals.tax.toFixed(2)}</div>
+            <div class="total">Tax: ${totals.tax.toFixed(2)}</div>
             <div class="total">Grand Total: ₹${totals.grandTotal.toFixed(2)}</div>
         </body>
         </html>
@@ -977,7 +962,7 @@ function toggleControlPanel() {
 
 function updateTime() {
     const now = new Date();
-    document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-US', { hour12: true });
+    document.getElementById('currentTime').textContent = now.toLocaleTimeString();
 }
 
 if (window.history.replaceState) {

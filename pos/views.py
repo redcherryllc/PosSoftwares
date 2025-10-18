@@ -1701,8 +1701,6 @@ def get_customers(request):
 
 
 
-
-
 @login_required
 def home_view(request):
     saas_user_id = request.session.get('saas_user_id')
@@ -1711,53 +1709,29 @@ def home_view(request):
     business_unit_group_id = request.session.get('business_unit_group_id')
     business_unit_id = request.session.get('business_unit_id')
     branch_id = request.session.get('branch_id')
-
     
-    clear_room_get = request.GET.get('clear_room')
-    if clear_room_get == '1':
+    
+    clear_room = request.GET.get('clear_room') or request.POST.get('clear_room')
+    if clear_room == '1':
         request.session.pop('selected_room_id', None)
         request.session.modified = True
-        logger.debug("Cleared selected_room_id from session via GET")
-        return JsonResponse({'status': 'success', 'room_id': None})
+        logger.debug("Cleared selected_room_id from session")
+        return redirect('home')
+    
+   
+    if request.method == 'POST' and 'room_id' in request.POST:
+        room_id_value = request.POST.get('room_id', '').strip()
+        if room_id_value:
+            room_id_value = int(room_id_value)
+            request.session['selected_room_id'] = room_id_value
+            logger.debug(f"Stored room_id in session: {room_id_value}")
+        else:
+            request.session.pop('selected_room_id', None)
+            logger.debug("Cleared room_id from session (empty value)")
+        request.session.modified = True
+        return JsonResponse({'status': 'success', 'room_id': room_id_value or None})
 
     
-    if request.method == 'POST':
-        try:
-            if request.content_type == 'application/json':
-                data = json.loads(request.body.decode('utf-8'))
-            else:
-                data = request.POST
-
-            room_id_value = data.get('room_id', '').strip()
-            clear_room = data.get('clear_room')
-
-            if clear_room == '1':
-                request.session.pop('selected_room_id', None)
-                request.session.modified = True
-                logger.debug("Cleared selected_room_id from session")
-                return JsonResponse({'status': 'success', 'room_id': None})
-
-            if room_id_value:
-                try:
-                    room_id_value = int(room_id_value)
-                    request.session['selected_room_id'] = room_id_value
-                    request.session.modified = True
-                    logger.debug(f"Stored room_id in session: {room_id_value}")
-                    return JsonResponse({'status': 'success', 'room_id': room_id_value})
-                except ValueError:
-                    logger.warning(f"Invalid room_id value: {room_id_value}")
-                    return JsonResponse({'status': 'error', 'message': 'Invalid room ID'}, status=400)
-            else:
-                request.session.pop('selected_room_id', None)
-                request.session.modified = True
-                logger.debug("Cleared room_id from session (empty value)")
-                return JsonResponse({'status': 'success', 'room_id': None})
-
-        except json.JSONDecodeError:
-            logger.error("Invalid JSON in request body")
-            return JsonResponse({'status': 'error', 'message': 'Invalid JSON'}, status=400)
-
-   
     selected_room_id = request.session.get('selected_room_id')
     selected_room = None
     if selected_room_id is not None:
@@ -1766,8 +1740,13 @@ def home_view(request):
             logger.debug(f"Selected room ID from session: {selected_room_id} (type: {type(selected_room_id)})")
             selected_room = Rooms.objects.get(room_id=selected_room_id, business_unit_id=business_unit_id)
             logger.debug(f"Found selected room: {selected_room.room_name} (ID: {selected_room.room_id})")
-        except (ValueError, Rooms.DoesNotExist):
-            logger.warning(f"Invalid or non-existent selected_room_id in session: {selected_room_id}")
+        except ValueError:
+            logger.warning(f"Invalid selected_room_id in session: {selected_room_id}")
+            selected_room_id = None
+            request.session.pop('selected_room_id', None)
+            request.session.modified = True
+        except Rooms.DoesNotExist:
+            logger.warning(f"Selected room not found: {selected_room_id}")
             selected_room_id = None
             request.session.pop('selected_room_id', None)
             request.session.modified = True
@@ -1796,7 +1775,7 @@ def home_view(request):
         vehicles = Vehicle.objects.filter(business_unit=business_unit)
         customers = Customer.objects.filter(business_unit=business_unit)
         customer_form = CustomerForm(business_unit=business_unit)
-        registration_form = RegistrationForm(business_unit=business_unit, initial={'room': selected_room_id})
+        registration_form = RegistrationForm(business_unit=business_unit)
 
         
         today = timezone.now().date()
@@ -1811,10 +1790,10 @@ def home_view(request):
         next_sale_no = f"{date_str}{next_seq_num}"
         logger.debug(f"Calculated next_sale_no: {next_sale_no}, business_unit_id: {business_unit_id}, branch_id: {branch_id}, today_sales_count: {today_sales_count}")
 
-       
-        if request.method == 'POST' and ('customer_submit' in data or 'registration_submit' in data):
-            if 'customer_submit' in data:
-                customer_form = CustomerForm(data, business_unit=business_unit)
+        
+        if request.method == 'POST':
+            if 'customer_submit' in request.POST:
+                customer_form = CustomerForm(request.POST, business_unit=business_unit)
                 if customer_form.is_valid():
                     customer = customer_form.save(commit=False)
                     customer.business_unit = business_unit
@@ -1827,20 +1806,18 @@ def home_view(request):
                     customer.update_marks = ''
                     customer.save()
                     return JsonResponse({
-                        'success': True,
-                        'customer': {
-                            'customer_id': customer.pk,
-                            'customer_name': customer.customer_name,
-                            'phone_1': customer.phone_1
-                        }
+                        'status': 'success',
+                        'customer_id': customer.pk,
+                        'customer_name': customer.customer_name,
+                        'customer_phone': customer.phone_1
                     })
                 else:
                     return JsonResponse({
-                        'success': False,
+                        'status': 'error',
                         'errors': customer_form.errors.as_json()
                     })
-            elif 'registration_submit' in data:
-                registration_form = RegistrationForm(data, business_unit=business_unit)
+            elif 'registration_submit' in request.POST:
+                registration_form = RegistrationForm(request.POST, business_unit=business_unit)
                 if registration_form.is_valid():
                     registration = registration_form.save(commit=False)
                     registration.business_unit_id = business_unit_id
@@ -1854,6 +1831,7 @@ def home_view(request):
                     registration.austatus = ''
                     registration.save()
                     
+                    
                     response_data = {
                         'status': 'success',
                         'registration_id': registration.pk,
@@ -1864,8 +1842,6 @@ def home_view(request):
                         response_data['room_id'] = registration.room.room_id
                         response_data['room_name'] = registration.room.room_name
                         response_data['location'] = registration.room.location
-                    else:
-                        response_data['room_id'] = None
                     
                     return JsonResponse(response_data)
                 else:
@@ -1874,7 +1850,7 @@ def home_view(request):
                         'errors': registration_form.errors.as_json()
                     })
 
-        
+       
         if request.GET.get('action') == 'search_customer':
             query = request.GET.get('q', '')
             logger.debug(f"Customer search query: {query}, business_unit_id: {business_unit_id}")
@@ -1925,7 +1901,6 @@ def home_view(request):
         logger.error(f"Error in home_view: {str(e)}", exc_info=True)
         messages.error(request, f"Error: {str(e)}")
         return redirect('login')
-  
 
 
 
