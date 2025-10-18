@@ -28,13 +28,6 @@
 
          <div class="sidebar-menu">
 
-            {% for item in allowed_menu_items %}
-        <a href="{% url item.url_name %}" class="menu-item {% if request.resolver_match.url_name == item.url_name %}active{% endif %}">
-            <i class="fas {{ item.icon }}"></i>
-            <span>{{ item.text }}</span>
-        </a>
-    {% endfor %}
-
              <a href="{% url 'admin_view' %}" class="menu-item {% if request.resolver_match.url_name == 'admin_view' %}active{% endif %}">
                 <i class="fas fa-user-shield"></i>
                 <span>Admin</span>
@@ -47,12 +40,12 @@
         <i class="fas fa-home"></i>
         <span>Home</span>
     </a>
-    {% comment %} {% for item in allowed_menu_items %}
+    {% for item in allowed_menu_items %}
         <a href="{% url item.url_name %}" class="menu-item {% if request.resolver_match.url_name == item.url_name %}active{% endif %}">
             <i class="fas {{ item.icon }}"></i>
             <span>{{ item.text }}</span>
         </a>
-    {% endfor %} {% endcomment %}
+    {% endfor %}
       
 </form>
     <a href="{% url 'logout' %}" class="menu-item">
@@ -80,6 +73,120 @@
     </div>
 
     <script src="{% static 'images/js/base.js' %}"></script>
+    <style>
+        /* Existing styles (assumed) with added sidebar scroll functionality */
+.sidebar {
+    width: 250px;
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    background-color: #2c3e50;
+    color: #fff;
+    transition: width 0.3s ease;
+    overflow-y: auto; /* Enable vertical scrolling */
+    scrollbar-width: thin; /* Firefox scrollbar styling */
+    scrollbar-color: #888 #2c3e50; /* Firefox scrollbar colors */
+}
+
+/* Webkit scrollbar styling for Chrome/Safari */
+.sidebar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: #2c3e50;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: #aaa;
+}
+
+.sidebar-header {
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #34495e;
+    position: sticky; /* Keep header fixed at top of sidebar */
+    top: 0;
+    z-index: 1;
+}
+
+.sidebar-menu {
+    padding: 10px 0;
+}
+
+.menu-item {
+    display: flex;
+    align-items: center;
+    padding: 15px 20px;
+    color: #fff;
+    text-decoration: none;
+    transition: background 0.2s ease;
+}
+
+.menu-item:hover {
+    background-color: #34495e;
+}
+
+.menu-item.active {
+    background-color: #1abc9c;
+}
+
+.menu-item i {
+    margin-right: 10px;
+}
+
+.main-content {
+    margin-left: 250px;
+    padding: 20px;
+    min-height: 100vh;
+    background-color: #f5f6fa;
+}
+
+.top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background-color: #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.page-title {
+    font-size: 24px;
+    font-weight: bold;
+}
+
+.user-info {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+.user-info a {
+    color: #2c3e50;
+    text-decoration: none;
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        width: 60px;
+    }
+    .main-content {
+        margin-left: 60px;
+    }
+    .sidebar-menu span {
+        display: none;
+    }
+}
+    </style>
 
 
 
