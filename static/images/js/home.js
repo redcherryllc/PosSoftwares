@@ -6,7 +6,6 @@ let currentServiceId = 0;
 let isRegistrationProcess = false;
 
 document.addEventListener('DOMContentLoaded', function() {
-   
     console.log('next_sale_no from template:', window.nextSaleNo);
     console.log('Current client date:', new Date().toLocaleDateString('en-CA'));
     console.log('Client timezone offset:', new Date().getTimezoneOffset());
@@ -271,7 +270,7 @@ document.addEventListener('DOMContentLoaded', function() {
     $('#registration-form').submit(function(e) {
         e.preventDefault();
         const formData = $(this).serialize();
-        const roomId = $('#id_room').val(); 
+        const roomId = $('#id_room').val();
         console.log('Registration form submitted with room_id:', roomId);
         console.log('Form data:', formData);
 
@@ -319,14 +318,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
 
                     const roomSelect = $('select[name="room_select"]');
-                    let selectedRoomId = roomId || response.room_id; 
+                    let selectedRoomId = response.room_id !== null ? String(response.room_id) : null;
+
                     if (selectedRoomId) {
-                        
-                        selectedRoomId = String(selectedRoomId);
-                        
-                        if (roomSelect.find('option').filter(function() { 
-                            return String($(this).val()) === selectedRoomId; 
-                        }).length === 0) {
+                        if (roomSelect.find(`option[value="${selectedRoomId}"]`).length === 0) {
                             if (response.room_name && response.location) {
                                 roomSelect.append(`<option value="${selectedRoomId}">${response.room_name} (${response.location})</option>`);
                                 console.log('Added room to dropdown:', selectedRoomId, response.room_name, response.location);
@@ -348,14 +343,12 @@ document.addEventListener('DOMContentLoaded', function() {
                                         console.log('Fetched and added room to dropdown:', selectedRoomId, room.room_name, room.location);
                                     } else {
                                         console.warn('Room details missing in API response');
-                                        alert('Room selected but details not available. Please check room configuration.');
-                                        selectedRoomId = null; 
+                                        selectedRoomId = null;
                                     }
                                 })
                                 .catch(error => {
                                     console.error('Error fetching room details:', error);
-                                    alert('Error fetching room details. Please try again.');
-                                    selectedRoomId = null; 
+                                    selectedRoomId = null;
                                 });
                             }
                         }
@@ -371,11 +364,10 @@ document.addEventListener('DOMContentLoaded', function() {
                                 headers: {
                                     'X-CSRFToken': getCookie('csrftoken')
                                 },
-                                data: {
-                                    room_id: selectedRoomId
-                                },
-                                success: function() {
-                                    console.log('Session updated with room_id:', selectedRoomId);
+                                data: JSON.stringify({ room_id: selectedRoomId }),
+                                contentType: 'application/json',
+                                success: function(data) {
+                                    console.log('Session updated with room_id:', selectedRoomId, data);
                                 },
                                 error: function(xhr, status, error) {
                                     console.error('Error updating session with room_id:', xhr.status, error, xhr.responseText);
@@ -384,25 +376,23 @@ document.addEventListener('DOMContentLoaded', function() {
                             });
                         }
                     } else {
-                        console.warn('No room_id found in form or response');
-                        roomSelect.val(''); 
+                        console.log('No room_id in response, clearing room selection');
+                        roomSelect.val('');
                         currentServiceType = '';
                         currentServiceId = 0;
-                        
                         $.ajax({
                             url: window.homeUrl,
                             method: 'POST',
                             headers: {
                                 'X-CSRFToken': getCookie('csrftoken')
                             },
-                            data: {
-                                clear_room: '1'
-                            },
-                            success: function() {
-                                console.log('Cleared room selection from session');
+                            data: JSON.stringify({ clear_room: '1' }),
+                            contentType: 'application/json',
+                            success: function(data) {
+                                console.log('Cleared room selection from session:', data);
                             },
                             error: function(xhr, status, error) {
-                                console.error('Error clearing room selection:', xhr.status, error);
+                                console.error('Error clearing room selection:', xhr.status, error, xhr.responseText);
                             }
                         });
                     }
@@ -987,7 +977,7 @@ function toggleControlPanel() {
 
 function updateTime() {
     const now = new Date();
-    document.getElementById('currentTime').textContent = now.toLocaleTimeString();
+    document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-US', { hour12: true });
 }
 
 if (window.history.replaceState) {
