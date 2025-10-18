@@ -26,7 +26,7 @@
 </div>
 
 
-         <div class="sidebar-menu">
+         <div class="sidebar-menu" style="max-height: 80vh; overflow-y: auto;">
 
              <a href="{% url 'admin_view' %}" class="menu-item {% if request.resolver_match.url_name == 'admin_view' %}active{% endif %}">
                 <i class="fas fa-user-shield"></i>
