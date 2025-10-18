@@ -40,12 +40,23 @@
         <i class="fas fa-home"></i>
         <span>Home</span>
     </a>
-    {% for item in allowed_menu_items %}
+    {% comment %} {% for item in allowed_menu_items %}
         <a href="{% url item.url_name %}" class="menu-item {% if request.resolver_match.url_name == item.url_name %}active{% endif %}">
             <i class="fas {{ item.icon }}"></i>
             <span>{{ item.text }}</span>
         </a>
-    {% endfor %}
+    {% endfor %} {% endcomment %}
+
+    {% for item in allowed_menu_items %}
+    {% if item.url_name and item.icon and item.text %}
+        <a href="{% url item.url_name|default:'#' %}" class="menu-item {% if request.resolver_match.url_name == item.url_name %}active{% endif %}">
+            <i class="fas {{ item.icon }}"></i>
+            <span>{{ item.text }}</span>
+        </a>
+    {% else %}
+        <p>Missing attributes for item: {{ item|safe }}</p>
+    {% endif %}
+{% endfor %}
       
 </form>
     <a href="{% url 'logout' %}" class="menu-item">
