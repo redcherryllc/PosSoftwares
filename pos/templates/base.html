@@ -28,6 +28,13 @@
 
          <div class="sidebar-menu">
 
+            {% for item in allowed_menu_items %}
+        <a href="{% url item.url_name %}" class="menu-item {% if request.resolver_match.url_name == item.url_name %}active{% endif %}">
+            <i class="fas {{ item.icon }}"></i>
+            <span>{{ item.text }}</span>
+        </a>
+    {% endfor %}
+
              <a href="{% url 'admin_view' %}" class="menu-item {% if request.resolver_match.url_name == 'admin_view' %}active{% endif %}">
                 <i class="fas fa-user-shield"></i>
                 <span>Admin</span>
@@ -40,12 +47,12 @@
         <i class="fas fa-home"></i>
         <span>Home</span>
     </a>
-    {% for item in allowed_menu_items %}
+    {% comment %} {% for item in allowed_menu_items %}
         <a href="{% url item.url_name %}" class="menu-item {% if request.resolver_match.url_name == item.url_name %}active{% endif %}">
             <i class="fas {{ item.icon }}"></i>
             <span>{{ item.text }}</span>
         </a>
-    {% endfor %}
+    {% endfor %} {% endcomment %}
       
 </form>
     <a href="{% url 'logout' %}" class="menu-item">
