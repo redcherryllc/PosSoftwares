@@ -5,8 +5,20 @@ let currentServiceType = '';
 let currentServiceId = 0;
 let isRegistrationProcess = false;
 
+window.registrationAddUrl = '{% url "registration_add" %}';
+window.addCustomerUrl = '{% url "add_customer" %}';
+window.getCustomersUrl = '/api/customers/';
+window.nextSaleNo = '{{ next_sale_no }}';
+window.selectedRoomId = '{{ selected_room_id|default:"" }}'.trim();
+window.homeUrl = '{% url "home" %}';
+
+console.log('Template Variables:', {
+    selectedRoomId: window.selectedRoomId,
+    nextSaleNo: window.nextSaleNo,
+    homeUrl: window.homeUrl
+});
+
 document.addEventListener('DOMContentLoaded', function() {
-   
     console.log('next_sale_no from template:', window.nextSaleNo);
     console.log('Current client date:', new Date().toLocaleDateString('en-CA'));
     console.log('Client timezone offset:', new Date().getTimezoneOffset());
@@ -40,6 +52,101 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    const roomSelect = document.querySelector('select[name="room_select"]');
+    const selectedRoomIdFromTemplate = window.selectedRoomId ? String(window.selectedRoomId).trim() : '';
+
+    console.log('Selected room ID from template:', selectedRoomIdFromTemplate);
+
+    if (selectedRoomIdFromTemplate) {
+        const matchingOption = roomSelect.querySelector(`option[value="${selectedRoomIdFromTemplate}"]`);
+        if (matchingOption) {
+            roomSelect.value = selectedRoomIdFromTemplate;
+            window.currentServiceType = 'ROOM';
+            window.currentServiceId = selectedRoomIdFromTemplate;
+            console.log('Room selected:', roomSelect.selectedOptions[0].text);
+
+            fetch(window.homeUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ room_id: selectedRoomIdFromTemplate })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                console.log('Room selection updated in session:', selectedRoomIdFromTemplate);
+            })
+            .catch(error => {
+                console.error('Error updating room selection:', error);
+                alert('Error updating room selection. Please try again.');
+            });
+        } else {
+            console.warn('Room option not found in dropdown:', selectedRoomIdFromTemplate);
+            roomSelect.value = '';
+            window.currentServiceType = '';
+            window.currentServiceId = 0;
+        }
+    } else {
+        console.log('No selected room ID, resetting room_select');
+        roomSelect.value = '';
+        window.currentServiceType = '';
+        window.currentServiceId = 0;
+    }
+
+    roomSelect.addEventListener('change', function() {
+        const selectedValue = this.value;
+        window.currentServiceType = selectedValue ? 'ROOM' : '';
+        window.currentServiceId = selectedValue || 0;
+
+        if (selectedValue) {
+            document.querySelector('select[name="table_select"]').value = '';
+            document.querySelector('select[name="vehicle_select"]').value = '';
+
+            console.log('Room selected, updating session with room_id:', selectedValue);
+
+            fetch(window.homeUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ room_id: selectedValue })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                console.log('Room selection updated in session:', selectedValue);
+            })
+            .catch(error => {
+                console.error('Error updating room selection:', error);
+                alert('Error updating room selection. Please try again.');
+            });
+        } else {
+            console.log('Room deselected, clearing session');
+            fetch(window.homeUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({ clear_room: '1' })
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                console.log('Cleared room selection from session');
+            })
+            .catch(error => {
+                console.error('Error clearing room selection:', error);
+            });
+        }
+    });
+
     $('.nav-button.set-customer').click(function() {
         isRegistrationProcess = false;
         $('#customer-search-section').hide();
@@ -59,9 +166,9 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#customer-search-results').empty();
         $('#customer-search-input').val('');
         $('#customerModalLabel').text('Customer and Registration');
-        
+
         const roomSelect = $('select[name="room_select"]');
-        const selectedRoomId = roomSelect.val();
+        const selectedRoomId = window.selectedRoomId ? String(window.selectedRoomId).trim() : roomSelect.val();
         if (selectedRoomId && $('#id_room').find(`option[value="${selectedRoomId}"]`).length > 0) {
             $('#id_room').val(selectedRoomId);
             console.log('Pre-selected room in registration form:', selectedRoomId);
@@ -137,9 +244,9 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#customer-form-section').hide();
         $('#registration-form-section').show();
         $('#customerModalLabel').text('Add Registration');
-        
+
         const roomSelect = $('select[name="room_select"]');
-        const selectedRoomId = roomSelect.val();
+        const selectedRoomId = window.selectedRoomId ? String(window.selectedRoomId).trim() : roomSelect.val();
         if (selectedRoomId && $('#id_room').find(`option[value="${selectedRoomId}"]`).length > 0) {
             $('#id_room').val(selectedRoomId);
             console.log('Pre-selected room in registration form:', selectedRoomId);
@@ -162,9 +269,9 @@ document.addEventListener('DOMContentLoaded', function() {
         $('#customer-search-section').hide();
         $('#registration-form-section').show();
         $('#customerModalLabel').text('Add Registration');
-        
+
         const roomSelect = $('select[name="room_select"]');
-        const selectedRoomId = roomSelect.val();
+        const selectedRoomId = window.selectedRoomId ? String(window.selectedRoomId).trim() : roomSelect.val();
         if (selectedRoomId && $('#id_room').find(`option[value="${selectedRoomId}"]`).length > 0) {
             $('#id_room').val(selectedRoomId);
             console.log('Pre-selected room in registration form:', selectedRoomId);
@@ -191,10 +298,10 @@ document.addEventListener('DOMContentLoaded', function() {
             },
             success: function(response) {
                 console.log('Add customer response:', response);
-                if (response.success && response.customer && response.customer.customer_id && response.customer.customer_name) {
+                if (response.status === 'success' && response.customer_id && response.customer_name) {
                     const customerSelect = $('select[name="customer_select"]');
-                    customerSelect.append(`<option value="${response.customer.customer_id}">${response.customer.customer_name}</option>`);
-                    customerSelect.val(response.customer.customer_id);
+                    customerSelect.append(`<option value="${response.customer_id}">${response.customer_name}</option>`);
+                    customerSelect.val(response.customer_id);
                     fetch(window.getCustomersUrl, {
                         headers: {
                             'X-CSRFToken': getCookie('csrftoken')
@@ -209,7 +316,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     .then(customers => {
                         customerSelect.empty().append('<option value="" disabled>👤 Customer</option>');
                         customers.forEach(customer => {
-                            const isSelected = customer.customer_id === response.customer.customer_id ? 'selected' : '';
+                            const isSelected = customer.customer_id === response.customer_id ? 'selected' : '';
                             customerSelect.append(`<option value="${customer.customer_id}" ${isSelected}>${customer.customer_name}</option>`);
                         });
                     })
@@ -220,17 +327,17 @@ document.addEventListener('DOMContentLoaded', function() {
 
                     if (isRegistrationProcess) {
                         const registrationCustomerSelect = $('#id_customer');
-                        if (registrationCustomerSelect.find(`option[value="${response.customer.customer_id}"]`).length === 0) {
-                            registrationCustomerSelect.append(`<option value="${response.customer.customer_id}">${response.customer.customer_name}</option>`);
+                        if (registrationCustomerSelect.find(`option[value="${response.customer_id}"]`).length === 0) {
+                            registrationCustomerSelect.append(`<option value="${response.customer_id}">${response.customer_name}</option>`);
                         }
-                        registrationCustomerSelect.val(response.customer.customer_id);
-                        $('#id_phone1').val(response.customer.phone_1 || '');
+                        registrationCustomerSelect.val(response.customer_id);
+                        $('#id_phone1').val(response.customer_phone || '');
                         $('#customer-form-section').hide();
                         $('#registration-form-section').show();
                         $('#customerModalLabel').text('Add Registration');
-                        
+
                         const roomSelect = $('select[name="room_select"]');
-                        const selectedRoomId = roomSelect.val();
+                        const selectedRoomId = window.selectedRoomId ? String(window.selectedRoomId).trim() : roomSelect.val();
                         if (selectedRoomId && $('#id_room').find(`option[value="${selectedRoomId}"]`).length > 0) {
                             $('#id_room').val(selectedRoomId);
                             console.log('Pre-selected room in registration form:', selectedRoomId);
@@ -244,7 +351,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         $form[0].reset();
                     }
                 } else {
-                    const errorMsg = response.error || 'Invalid response from server';
+                    const errorMsg = response.errors ? JSON.stringify(response.errors) : 'Invalid response from server';
                     alert('Error adding customer: ' + errorMsg);
                 }
                 $submitBtn.prop('disabled', false).text('Save Customer');
@@ -271,7 +378,7 @@ document.addEventListener('DOMContentLoaded', function() {
     $('#registration-form').submit(function(e) {
         e.preventDefault();
         const formData = $(this).serialize();
-        const roomId = $('#id_room').val(); 
+        const roomId = $('#id_room').val();
         console.log('Registration form submitted with room_id:', roomId);
         console.log('Form data:', formData);
 
@@ -319,13 +426,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
 
                     const roomSelect = $('select[name="room_select"]');
-                    let selectedRoomId = roomId || response.room_id; 
+                    let selectedRoomId = roomId || response.room_id;
                     if (selectedRoomId) {
-                        
                         selectedRoomId = String(selectedRoomId);
-                        
-                        if (roomSelect.find('option').filter(function() { 
-                            return String($(this).val()) === selectedRoomId; 
+
+                        if (roomSelect.find('option').filter(function() {
+                            return String($(this).val()) === selectedRoomId;
                         }).length === 0) {
                             if (response.room_name && response.location) {
                                 roomSelect.append(`<option value="${selectedRoomId}">${response.room_name} (${response.location})</option>`);
@@ -349,13 +455,13 @@ document.addEventListener('DOMContentLoaded', function() {
                                     } else {
                                         console.warn('Room details missing in API response');
                                         alert('Room selected but details not available. Please check room configuration.');
-                                        selectedRoomId = null; 
+                                        selectedRoomId = null;
                                     }
                                 })
                                 .catch(error => {
                                     console.error('Error fetching room details:', error);
                                     alert('Error fetching room details. Please try again.');
-                                    selectedRoomId = null; 
+                                    selectedRoomId = null;
                                 });
                             }
                         }
@@ -385,10 +491,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     } else {
                         console.warn('No room_id found in form or response');
-                        roomSelect.val(''); 
+                        roomSelect.val('');
                         currentServiceType = '';
                         currentServiceId = 0;
-                        
+
                         $.ajax({
                             url: window.homeUrl,
                             method: 'POST',
