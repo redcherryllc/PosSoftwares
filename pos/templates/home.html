@@ -42,7 +42,7 @@
     <option value="" disabled {% if not selected_room_id %}selected{% endif %}>🏨 Room</option>
     {% for room in rooms %}
         <option value="{{ room.room_id }}"
-                {% if selected_room_id and selected_room_id|stringformat:"s" == room.room_id|stringformat:"s" %}selected{% endif %}>
+                {% if selected_room_id == room.room_id %}selected{% endif %}>
             {{ room.room_name }} ({{ room.location }})
         </option>
     {% empty %}
@@ -230,10 +230,10 @@
         homeUrl: window.homeUrl
     });
 
-    // Initialize room selection on page load
+    
     document.addEventListener('DOMContentLoaded', function() {
         const roomSelect = document.querySelector('select[name="room_select"]');
-        const selectedRoomIdFromTemplate = window.selectedRoomId ? String(window.selectedRoomId).trim() : '';
+        const selectedRoomIdFromTemplate = window.selectedRoomId ? window.selectedRoomId.trim() : '';
         
         console.log('Selected room ID from template:', selectedRoomIdFromTemplate);
         
@@ -245,7 +245,7 @@
                 window.currentServiceId = selectedRoomIdFromTemplate;
                 console.log('Room selected:', roomSelect.selectedOptions[0].text);
 
-                // Update session with selected room_id
+                
                 fetch(window.homeUrl, {
                     method: 'POST',
                     headers: {
@@ -277,14 +277,14 @@
             window.currentServiceId = 0;
         }
 
-        // Handle room selection changes
+        
         roomSelect.addEventListener('change', function() {
             const selectedValue = this.value;
             window.currentServiceType = selectedValue ? 'ROOM' : '';
             window.currentServiceId = selectedValue || 0;
 
             if (selectedValue) {
-                // Clear other service selections
+                
                 document.querySelector('select[name="table_select"]').value = '';
                 document.querySelector('select[name="vehicle_select"]').value = '';
                 

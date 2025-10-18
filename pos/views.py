@@ -1699,6 +1699,7 @@ def get_customers(request):
         logger.error(f"Error in get_customers: {str(e)}")
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
+        
 
 @login_required
 def home_view(request):
@@ -1709,16 +1710,53 @@ def home_view(request):
     business_unit_id = request.session.get('business_unit_id')
     branch_id = request.session.get('branch_id')
     
+    
     clear_room = request.GET.get('clear_room') or request.POST.get('clear_room')
     if clear_room == '1':
         request.session.pop('selected_room_id', None)
         request.session.modified = True
         logger.debug("Cleared selected_room_id from session")
+        if request.method == 'POST':
+            return JsonResponse({'status': 'success', 'room_id': None})
+    
+    
+    if request.method == 'POST' and 'room_id' in request.POST:
+        room_id_value = request.POST.get('room_id', '').strip()
+        if room_id_value:
+            try:
+                room_id_value = int(room_id_value)
+                request.session['selected_room_id'] = room_id_value
+                request.session.modified = True
+                logger.debug(f"Stored room_id in session: {room_id_value} (type: {type(room_id_value)})")
+                return JsonResponse({'status': 'success', 'room_id': room_id_value})
+            except ValueError:
+                logger.warning(f"Invalid room_id value: {room_id_value}")
+                return JsonResponse({'status': 'error', 'message': 'Invalid room ID'})
+        else:
+            request.session.pop('selected_room_id', None)
+            request.session.modified = True
+            logger.debug("Cleared room_id from session (empty value)")
+            return JsonResponse({'status': 'success', 'room_id': None})
+
     
     selected_room_id = request.session.get('selected_room_id')
+    selected_room = None
     if selected_room_id is not None:
-        selected_room_id = str(selected_room_id)
-        logger.debug(f"Selected room ID from session: {selected_room_id} (type: {type(selected_room_id)})")
+        try:
+            selected_room_id = int(selected_room_id)
+            logger.debug(f"Selected room ID from session: {selected_room_id} (type: {type(selected_room_id)})")
+            selected_room = Rooms.objects.get(room_id=selected_room_id, business_unit_id=business_unit_id)
+            logger.debug(f"Found selected room: {selected_room.room_name} (ID: {selected_room.room_id})")
+        except ValueError:
+            logger.warning(f"Invalid selected_room_id in session: {selected_room_id}")
+            selected_room_id = None
+            request.session.pop('selected_room_id', None)
+            request.session.modified = True
+        except Rooms.DoesNotExist:
+            logger.warning(f"Selected room not found: {selected_room_id}")
+            selected_room_id = None
+            request.session.pop('selected_room_id', None)
+            request.session.modified = True
     else:
         logger.debug("No selected room ID in session")
 
@@ -1745,32 +1783,6 @@ def home_view(request):
         customers = Customer.objects.filter(business_unit=business_unit)
         customer_form = CustomerForm(business_unit=business_unit)
         registration_form = RegistrationForm(business_unit=business_unit)
-
-        
-        if request.method == 'POST' and 'room_id' in request.POST:
-            room_id_value = request.POST.get('room_id', '').strip()
-            if room_id_value:
-                
-                request.session['selected_room_id'] = str(room_id_value)
-                logger.debug(f"Stored room_id in session: {room_id_value}")
-            else:
-                request.session.pop('selected_room_id', None)
-                logger.debug("Cleared room_id from session (empty value)")
-            request.session.modified = True
-            return JsonResponse({'status': 'success', 'room_id': room_id_value or None})
-
-        
-        selected_room = None
-        if selected_room_id:
-            try:
-                
-                selected_room = Rooms.objects.get(room_id=int(selected_room_id), business_unit=business_unit)
-                logger.debug(f"Found selected room: {selected_room.room_name} (ID: {selected_room.room_id})")
-            except (Rooms.DoesNotExist, ValueError) as e:
-                logger.warning(f"Selected room not found or invalid: {selected_room_id}, Error: {e}")
-                selected_room_id = None
-                request.session.pop('selected_room_id', None)
-                request.session.modified = True
 
         
         today = timezone.now().date()
@@ -1834,7 +1846,7 @@ def home_view(request):
                     }
                     
                     if registration.room:
-                        response_data['room_id'] = str(registration.room.room_id)
+                        response_data['room_id'] = registration.room.room_id
                         response_data['room_name'] = registration.room.room_name
                         response_data['location'] = registration.room.location
                     
@@ -1845,7 +1857,7 @@ def home_view(request):
                         'errors': registration_form.errors.as_json()
                     })
 
-       
+        
         if request.GET.get('action') == 'search_customer':
             query = request.GET.get('q', '')
             logger.debug(f"Customer search query: {query}, business_unit_id: {business_unit_id}")
@@ -1887,7 +1899,6 @@ def home_view(request):
             'allowed_menu_items': allowed_menu_items,
             'selected_room_id': selected_room_id,  
             'selected_room': selected_room,
-            'selected_room_id': request.session.get('room_id', ''),
         }
         
         logger.debug(f"Context selected_room_id: {selected_room_id} (type: {type(selected_room_id)})")
