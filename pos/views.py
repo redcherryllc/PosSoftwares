@@ -1699,7 +1699,10 @@ def get_customers(request):
         logger.error(f"Error in get_customers: {str(e)}")
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
-        
+
+
+
+logger = logging.getLogger(__name__)
 
 @login_required
 def home_view(request):
@@ -1711,32 +1714,47 @@ def home_view(request):
     branch_id = request.session.get('branch_id')
     
     
-    clear_room = request.GET.get('clear_room') or request.POST.get('clear_room')
-    if clear_room == '1':
+    clear_room_get = request.GET.get('clear_room')
+    if clear_room_get == '1':
         request.session.pop('selected_room_id', None)
         request.session.modified = True
-        logger.debug("Cleared selected_room_id from session")
-        if request.method == 'POST':
-            return JsonResponse({'status': 'success', 'room_id': None})
+        logger.debug("Cleared selected_room_id from session via GET")
     
     
-    if request.method == 'POST' and 'room_id' in request.POST:
-        room_id_value = request.POST.get('room_id', '').strip()
-        if room_id_value:
-            try:
+    if request.method == 'POST':
+        try:
+            if request.content_type == 'application/json':
+                data = json.loads(request.body.decode('utf-8'))
+            else:
+                data = request.POST
+            
+            room_id_value = data.get('room_id', '').strip()
+            clear_room = data.get('clear_room')
+            
+            if clear_room == '1':
+                request.session.pop('selected_room_id', None)
+                request.session.modified = True
+                logger.debug("Cleared selected_room_id from session")
+                return JsonResponse({'status': 'success', 'room_id': None})
+            
+            if room_id_value:
                 room_id_value = int(room_id_value)
                 request.session['selected_room_id'] = room_id_value
                 request.session.modified = True
-                logger.debug(f"Stored room_id in session: {room_id_value} (type: {type(room_id_value)})")
+                logger.debug(f"Stored room_id in session: {room_id_value}")
                 return JsonResponse({'status': 'success', 'room_id': room_id_value})
-            except ValueError:
-                logger.warning(f"Invalid room_id value: {room_id_value}")
-                return JsonResponse({'status': 'error', 'message': 'Invalid room ID'})
-        else:
-            request.session.pop('selected_room_id', None)
-            request.session.modified = True
-            logger.debug("Cleared room_id from session (empty value)")
-            return JsonResponse({'status': 'success', 'room_id': None})
+            else:
+                request.session.pop('selected_room_id', None)
+                request.session.modified = True
+                logger.debug("Cleared room_id from session (empty value)")
+                return JsonResponse({'status': 'success', 'room_id': None})
+                
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON in request body")
+            return JsonResponse({'status': 'error', 'message': 'Invalid JSON'}, status=400)
+        except ValueError:
+            logger.warning(f"Invalid room_id value: {room_id_value}")
+            return JsonResponse({'status': 'error', 'message': 'Invalid room ID'}, status=400)
 
     
     selected_room_id = request.session.get('selected_room_id')
@@ -1784,7 +1802,7 @@ def home_view(request):
         customer_form = CustomerForm(business_unit=business_unit)
         registration_form = RegistrationForm(business_unit=business_unit)
 
-        
+       
         today = timezone.now().date()
         logger.debug(f"Current date in home_view: {today}")
         today_sales_count = SalesHeader.objects.filter(
@@ -1799,8 +1817,8 @@ def home_view(request):
 
         
         if request.method == 'POST':
-            if 'customer_submit' in request.POST:
-                customer_form = CustomerForm(request.POST, business_unit=business_unit)
+            if 'customer_submit' in data:  
+                customer_form = CustomerForm(data, business_unit=business_unit)
                 if customer_form.is_valid():
                     customer = customer_form.save(commit=False)
                     customer.business_unit = business_unit
@@ -1813,18 +1831,20 @@ def home_view(request):
                     customer.update_marks = ''
                     customer.save()
                     return JsonResponse({
-                        'status': 'success',
-                        'customer_id': customer.pk,
-                        'customer_name': customer.customer_name,
-                        'customer_phone': customer.phone_1
+                        'success': True,
+                        'customer': {
+                            'customer_id': customer.pk,
+                            'customer_name': customer.customer_name,
+                            'phone_1': customer.phone_1
+                        }
                     })
                 else:
                     return JsonResponse({
-                        'status': 'error',
+                        'success': False,
                         'errors': customer_form.errors.as_json()
                     })
-            elif 'registration_submit' in request.POST:
-                registration_form = RegistrationForm(request.POST, business_unit=business_unit)
+            elif 'registration_submit' in data:
+                registration_form = RegistrationForm(data, business_unit=business_unit)
                 if registration_form.is_valid():
                     registration = registration_form.save(commit=False)
                     registration.business_unit_id = business_unit_id
@@ -1837,7 +1857,6 @@ def home_view(request):
                     registration.update_remarks = ''
                     registration.austatus = ''
                     registration.save()
-                    
                     
                     response_data = {
                         'status': 'success',
@@ -1857,7 +1876,7 @@ def home_view(request):
                         'errors': registration_form.errors.as_json()
                     })
 
-        
+       
         if request.GET.get('action') == 'search_customer':
             query = request.GET.get('q', '')
             logger.debug(f"Customer search query: {query}, business_unit_id: {business_unit_id}")
@@ -1897,7 +1916,7 @@ def home_view(request):
             'registration_form': registration_form,
             'next_sale_no': next_sale_no,
             'allowed_menu_items': allowed_menu_items,
-            'selected_room_id': selected_room_id,  
+            'selected_room_id': selected_room_id, 
             'selected_room': selected_room,
         }
         
