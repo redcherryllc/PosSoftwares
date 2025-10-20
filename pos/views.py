@@ -92,7 +92,7 @@ def get_allowed_menu_items(saas_username, business_unit_id):
     allowed_menus = Authority.objects.filter(
         business_unit_id=business_unit_id,
         saas_username=saas_username,
-        au_status='TRUE'
+        au_status__in=['TRUE', 'true', 'True']
     ).values('au_menu', 'au_submenu', 'au_menu_text', 'au_submenu_text')
 
     menu_url_mapping = {
@@ -118,11 +118,12 @@ def get_allowed_menu_items(saas_username, business_unit_id):
 
     return [
         {
-            'url_name': menu_url_mapping.get(menu['au_submenu'], {}).get('url', '#'),
-            'icon': menu_url_mapping.get(menu['au_submenu'], {}).get('icon', 'fa-circle'),
-            'text': menu_url_mapping.get(menu['au_submenu'], {}).get('text', menu['au_submenu_text'])
+            'url_name': menu_url_mapping[menu['au_submenu']]['url'],
+            'icon': menu_url_mapping[menu['au_submenu']]['icon'],
+            'text': menu_url_mapping[menu['au_submenu']]['text']
         }
         for menu in allowed_menus
+        if menu['au_submenu'] in menu_url_mapping
     ]
 
 def get_business_unit_groups(request):
